@@ -7,39 +7,51 @@ from datetime import datetime
 
 # --- AYARLAR ---
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
-KONTROL_ARALIGI_DAKIKA = 30
-VERI_DOSYASI = "gecmis_kayitlar.json"
-RAPOR_DOSYASI = "index.html"
-GEMINI_API_KEY = ""
+# GitHub Actions ortamında API Key environment variable'dan alınır
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
 
 def veri_cek():
+    """Web sitesine bağlanıp Merkez listesini akıllıca çeker ve birleştirir."""
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         response = requests.get(URL, headers=headers, timeout=20)
         response.raise_for_status()
+        
         soup = BeautifulSoup(response.content, "html.parser")
         tum_metin = soup.get_text(separator="\n")
         satirlar = [s.strip() for s in tum_metin.split("\n") if s.strip()]
         
         merkez_listesi = []
+        gecici_gorev = "" 
         kayit_basladi = False
+        
         for satir in satirlar:
             if satir == "MERKEZ":
                 kayit_basladi = True
                 continue
             if satir == "AKDAĞMADENİ" and kayit_basladi:
                 break
-            if kayit_basladi and satir != "+" and len(satir) > 2:
-                merkez_listesi.append(satir)
+            
+            if kayit_basladi and satir != "+":
+                if "ECZANESİ" in satir.upper():
+                    if gecici_gorev:
+                        merkez_listesi.append(f"{gecici_gorev} {satir}")
+                        gecici_gorev = ""
+                    else:
+                        merkez_listesi.append(satir)
+                else:
+                    gecici_gorev = satir
+                    
         return merkez_listesi
+
     except Exception as e:
         print(f"Hata oluştu: {e}")
         return None
 
 def html_sablonu_olustur(tum_veriler_json):
-    # CSS Kodu (Normal String - f-string degil)
+    # CSS Kodu
     css_kodu = """
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -57,7 +69,7 @@ def html_sablonu_olustur(tum_veriler_json):
     </style>
     """
 
-    # JS Kodu (Normal String - f-string degil)
+    # JS Kodu
     js_kodu = """
     <script>
         function manualRefresh() { window.location.reload(); }
@@ -71,16 +83,68 @@ def html_sablonu_olustur(tum_veriler_json):
 
         function getTheme(headerText) {
             const text = headerText.toUpperCase();
-            if (text.includes("MOR") || text.includes("TURUNCU")) return { card: "bg-gradient-to-br from-white to-orange-50 border-orange-200 hover:to-orange-100 border-l-orange-500", badge: "bg-orange-100 text-orange-800 border-orange-200", icon: "text-orange-500 bg-orange-50 group-hover:bg-orange-500 group-hover:text-white" };
-            if (text.includes("ERİTROPOEİTİN")) return { card: "bg-gradient-to-br from-white to-blue-50 border-blue-200 hover:to-blue-100 border-l-blue-500", badge: "bg-blue-100 text-blue-800 border-blue-200", icon: "text-blue-500 bg-blue-50 group-hover:bg-blue-500 group-hover:text-white" };
-            if (text.includes("DİYALİZ")) return { card: "bg-gradient-to-br from-white to-cyan-50 border-cyan-200 hover:to-cyan-100 border-l-cyan-500", badge: "bg-cyan-100 text-cyan-800 border-cyan-200", icon: "text-cyan-500 bg-cyan-50 group-hover:bg-cyan-500 group-hover:text-white" };
-            if (text.includes("TÜP BEBEK")) return { card: "bg-gradient-to-br from-white to-pink-50 border-pink-200 hover:to-pink-100 border-l-pink-500", badge: "bg-pink-100 text-pink-800 border-pink-200", icon: "text-pink-500 bg-pink-50 group-hover:bg-pink-500 group-hover:text-white" };
-            if (text.includes("CEZAEVİ")) return { card: "bg-gradient-to-br from-white to-red-50 border-red-200 hover:to-red-100 border-l-red-500", badge: "bg-red-100 text-red-800 border-red-200", icon: "text-red-500 bg-red-50 group-hover:bg-red-500 group-hover:text-white" };
-            if (text.includes("KANAKINUMAB")) return { card: "bg-gradient-to-br from-white to-indigo-50 border-indigo-200 hover:to-indigo-100 border-l-indigo-500", badge: "bg-indigo-100 text-indigo-800 border-indigo-200", icon: "text-indigo-500 bg-indigo-50 group-hover:bg-indigo-500 group-hover:text-white" };
-            if (text.includes("YATAN HASTA")) return { card: "bg-gradient-to-br from-white to-emerald-50 border-emerald-200 hover:to-emerald-100 border-l-emerald-500", badge: "bg-emerald-100 text-emerald-800 border-emerald-200", icon: "text-emerald-500 bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white" };
-            if (text.includes("ANTİ-TNF")) return { card: "bg-gradient-to-br from-white to-teal-50 border-teal-200 hover:to-teal-100 border-l-teal-500", badge: "bg-teal-100 text-teal-800 border-teal-200", icon: "text-teal-500 bg-teal-50 group-hover:bg-teal-500 group-hover:text-white" };
-            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return { card: "bg-gradient-to-br from-white to-violet-50 border-violet-200 hover:to-violet-100 border-l-violet-500", badge: "bg-violet-100 text-violet-800 border-violet-200", icon: "text-violet-500 bg-violet-50 group-hover:bg-violet-500 group-hover:text-white" };
-            return { card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", badge: "bg-gray-100 text-gray-700 border-gray-200", icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white" };
+            if (text.includes("MOR") || text.includes("TURUNCU")) return { 
+                card: "bg-gradient-to-br from-white to-orange-50 border-orange-200 hover:to-orange-100 border-l-orange-500", 
+                badge: "bg-orange-100 text-orange-800 border-orange-200", 
+                icon: "text-orange-500 bg-orange-50 group-hover:bg-orange-500 group-hover:text-white",
+                text: "text-orange-900 group-hover:text-orange-700"
+            };
+            if (text.includes("ERİTROPOEİTİN") || text.includes("DARBEPOETİN")) return { 
+                card: "bg-gradient-to-br from-white to-blue-50 border-blue-200 hover:to-blue-100 border-l-blue-500", 
+                badge: "bg-blue-100 text-blue-800 border-blue-200", 
+                icon: "text-blue-500 bg-blue-50 group-hover:bg-blue-500 group-hover:text-white",
+                text: "text-blue-900 group-hover:text-blue-700"
+            };
+            if (text.includes("DİYALİZ")) return { 
+                card: "bg-gradient-to-br from-white to-cyan-50 border-cyan-200 hover:to-cyan-100 border-l-cyan-500", 
+                badge: "bg-cyan-100 text-cyan-800 border-cyan-200", 
+                icon: "text-cyan-500 bg-cyan-50 group-hover:bg-cyan-500 group-hover:text-white",
+                text: "text-cyan-900 group-hover:text-cyan-700"
+            };
+            if (text.includes("TÜP BEBEK")) return { 
+                card: "bg-gradient-to-br from-white to-pink-50 border-pink-200 hover:to-pink-100 border-l-pink-500", 
+                badge: "bg-pink-100 text-pink-800 border-pink-200", 
+                icon: "text-pink-500 bg-pink-50 group-hover:bg-pink-500 group-hover:text-white",
+                text: "text-pink-900 group-hover:text-pink-700"
+            };
+            if (text.includes("CEZAEVİ")) return { 
+                card: "bg-gradient-to-br from-white to-red-50 border-red-200 hover:to-red-100 border-l-red-500", 
+                badge: "bg-red-100 text-red-800 border-red-200", 
+                icon: "text-red-500 bg-red-50 group-hover:bg-red-500 group-hover:text-white",
+                text: "text-red-900 group-hover:text-red-700"
+            };
+            if (text.includes("KANAKINUMAB")) return { 
+                card: "bg-gradient-to-br from-white to-indigo-50 border-indigo-200 hover:to-indigo-100 border-l-indigo-500", 
+                badge: "bg-indigo-100 text-indigo-800 border-indigo-200", 
+                icon: "text-indigo-500 bg-indigo-50 group-hover:bg-indigo-500 group-hover:text-white",
+                text: "text-indigo-900 group-hover:text-indigo-700"
+            };
+            if (text.includes("YATAN HASTA")) return { 
+                card: "bg-gradient-to-br from-white to-emerald-50 border-emerald-200 hover:to-emerald-100 border-l-emerald-500", 
+                badge: "bg-emerald-100 text-emerald-800 border-emerald-200", 
+                icon: "text-emerald-500 bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white",
+                text: "text-emerald-900 group-hover:text-emerald-700"
+            };
+            if (text.includes("ANTİ-TNF")) return { 
+                card: "bg-gradient-to-br from-white to-teal-50 border-teal-200 hover:to-teal-100 border-l-teal-500", 
+                badge: "bg-teal-100 text-teal-800 border-teal-200", 
+                icon: "text-teal-500 bg-teal-50 group-hover:bg-teal-500 group-hover:text-white",
+                text: "text-teal-900 group-hover:text-teal-700"
+            };
+            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return { 
+                card: "bg-gradient-to-br from-white to-violet-50 border-violet-200 hover:to-violet-100 border-l-violet-500", 
+                badge: "bg-violet-100 text-violet-800 border-violet-200", 
+                icon: "text-violet-500 bg-violet-50 group-hover:bg-violet-500 group-hover:text-white",
+                text: "text-violet-900 group-hover:text-violet-700"
+            };
+
+            // Varsayılan
+            return { 
+                card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
+                badge: "bg-gray-100 text-gray-700 border-gray-200", 
+                icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white",
+                text: "text-gray-800 group-hover:text-gray-600"
+            };
         }
 
         function openFullHistoryModal() {
@@ -193,7 +257,7 @@ def html_sablonu_olustur(tum_veriler_json):
                 el.className = `border rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-l-4 group cursor-pointer active:scale-[0.98] select-none ${theme.card}`;
                 const safeHeader = parsed.header.replace(/'/g, "\\'");
                 el.setAttribute('onclick', `showHistory('${safeHeader}')`);
-                el.innerHTML = `<div class="flex justify-between items-start"><div class="w-full"><div class="mb-2"><span class="${theme.badge} border px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide inline-block shadow-sm">${parsed.header}</span></div><div class="text-lg font-bold text-gray-800 group-hover:text-blue-700 transition-colors pl-1">${parsed.pharmacy}</div></div><div class="ml-3 flex-shrink-0 pt-1"><div class="w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${theme.icon}"><i class="fas fa-history"></i></div></div></div>`;
+                el.innerHTML = `<div class="flex justify-between items-start"><div class="w-full"><div class="mb-2"><span class="${theme.badge} border px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide inline-block shadow-sm">${parsed.header}</span></div><div class="text-lg font-bold ${theme.text} transition-colors pl-1">${parsed.pharmacy}</div></div><div class="ml-3 flex-shrink-0 pt-1"><div class="w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${theme.icon}"><i class="fas fa-history"></i></div></div></div>`;
                 listContainer.appendChild(el);
             });
 
@@ -456,4 +520,4 @@ def main():
         break 
 
 if __name__ == "__main__":
-    main()
+    proje_olustur()
