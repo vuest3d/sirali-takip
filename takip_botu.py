@@ -7,11 +7,9 @@ from datetime import datetime
 
 # --- AYARLAR ---
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
-KONTROL_ARALIGI_DAKIKA = 30  # <-- İşte bu eksikti, geri geldi!
+KONTROL_ARALIGI_DAKIKA = 30
 VERI_DOSYASI = "gecmis_kayitlar.json"
 RAPOR_DOSYASI = "index.html"
-
-# GitHub Actions ortamında API Key environment variable'dan alınır
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
 
 def veri_cek():
@@ -76,7 +74,11 @@ def html_sablonu_olustur(tum_veriler_json):
     # JS Kodu
     js_kodu = """
     <script>
-        function manualRefresh() { window.location.reload(); }
+        function manualRefresh() { 
+            const url = window.location.href.split('?')[0];
+            const timeStamp = new Date().getTime();
+            window.location.href = url + '?v=' + timeStamp;
+        }
 
         function parseItem(text) {
             const regex = /^(.*?)(\S+\s+ECZANESİ)$/i;
@@ -142,7 +144,6 @@ def html_sablonu_olustur(tum_veriler_json):
                 text: "text-violet-900 group-hover:text-violet-700"
             };
 
-            // Varsayılan
             return { 
                 card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
                 badge: "bg-gray-100 text-gray-700 border-gray-200", 
@@ -347,12 +348,15 @@ def html_sablonu_olustur(tum_veriler_json):
     </script>
     """
 
-    # HTML Sablonu
+    # HTML Sablonu - GÜNCELLEME: Meta Tag'ler Eklendi
     html = f"""<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Sıralı Eşit Dağıtım Takip</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -394,7 +398,7 @@ def html_sablonu_olustur(tum_veriler_json):
             </div>
             <div class="flex flex-col md:flex-row gap-4 items-end md:items-center">
                 <div class="flex gap-2 items-center">
-                    <button onclick="window.location.reload()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm group"><i class="fas fa-sync-alt mr-2 group-hover:animate-spin"></i>Listeyi Yenile</button>
+                    <button onclick="manualRefresh()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center shadow-sm group"><i class="fas fa-sync-alt mr-2 group-hover:animate-spin"></i>Listeyi Yenile</button>
                     <div class="h-8 w-px bg-gray-200 mx-1"></div>
                     <input type="file" id="importFile" accept=".json" class="hidden" onchange="handleFileUpload(this)">
                     <button onclick="document.getElementById('importFile').click()" class="bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center"><i class="fas fa-upload mr-2"></i>Yedek Yükle</button>
@@ -418,6 +422,7 @@ def html_sablonu_olustur(tum_veriler_json):
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- SOL PANEL -->
             <div class="lg:col-span-4 space-y-6 lg:order-1">
                 <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-purple-100">
                     <div class="ai-gradient p-4 text-white">
@@ -444,6 +449,7 @@ def html_sablonu_olustur(tum_veriler_json):
                 </div>
             </div>
 
+            <!-- SAĞ PANEL -->
             <div class="lg:col-span-8 lg:order-2">
                 <div class="bg-white rounded-xl shadow-sm p-5 h-full">
                     <h2 class="font-bold text-lg mb-4 text-gray-800 border-b pb-2 flex justify-between items-center">
