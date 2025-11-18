@@ -520,4 +520,5 @@ def main():
         break 
 
 if __name__ == "__main__":
-    proje_olustur()
+    main()
+
