@@ -136,6 +136,11 @@
     </script>
     
     <script>
+        // Python'dan gelen güncel kontrol saati
+        let serverLastCheck = "19.11.2025 00:13";
+        // Python'dan gelen API Anahtarı (Eğer yoksa boş gelir)
+        const apiKey = "";
+
         function manualRefresh() { 
             const url = window.location.href.split('?')[0];
             const timeStamp = new Date().getTime();
@@ -206,6 +211,7 @@
                 text: "text-violet-900 group-hover:text-violet-700"
             };
 
+            // Varsayılan
             return { 
                 card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
                 badge: "bg-gray-100 text-gray-700 border-gray-200", 
@@ -312,7 +318,13 @@
         function renderUI(data) {
             if (!data || data.length === 0) return;
             const lastRecord = data[data.length - 1];
-            document.getElementById('last-check-display').innerText = lastRecord.tarih;
+            
+            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {
+                document.getElementById('last-check-display').innerText = serverLastCheck;
+            } else {
+                document.getElementById('last-check-display').innerText = lastRecord.tarih;
+            }
+            
             const listContainer = document.getElementById('current-list-container');
             listContainer.innerHTML = '';
             document.getElementById('count-display').innerText = lastRecord.liste.length + ' Kayıt';
@@ -370,7 +382,11 @@
                 try {
                     const json = JSON.parse(e.target.result);
                     if (Array.isArray(json)) {
-                        appData = json; renderUI(appData); alert("Yedek başarıyla yüklendi!");
+                        appData = json;
+                        // Yedek yüklenince sunucu saatini sıfırla ki yedeğin saati görünsün
+                        serverLastCheck = null;
+                        renderUI(appData);
+                        alert("Yedek başarıyla yüklendi!");
                     } else { alert("Hatalı format."); }
                 } catch (error) { alert("Hata: " + error); }
             };
@@ -378,8 +394,7 @@
         }
         function downloadCSV() {
             let csvContent = "\uFEFFTarih,Liste İçeriği\n"; 
-            appData.forEach(record => { record.liste.forEach(item => { let cleanItem = item.replace(/"/g, '""'); csvContent += `"${record.tarih}","${cleanItem}"
-`; }); });
+            appData.forEach(record => { record.liste.forEach(item => { let cleanItem = item.replace(/"/g, '""'); csvContent += `"${record.tarih}","${cleanItem}"\n`; }); });
             saveFile(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }), "dagitim_gecmisi.csv");
         }
         function downloadJSON() { saveFile(new Blob([JSON.stringify(appData, null, 4)], { type: 'application/json' }), "dagitim_yedek.json"); }
@@ -389,6 +404,14 @@
         
         async function callGeminiAPI(prompt) {
             toggleResponseArea(true);
+            
+            // HATA YAKALAMA: API Anahtarı Yoksa Uyar
+            if (!apiKey || apiKey === "") {
+                document.getElementById('ai-result').innerHTML = `<div class="text-red-500 p-3 bg-red-50 rounded border border-red-200">⚠️ <strong>API Anahtarı Eksik!</strong><br>Lütfen GitHub Secrets ayarlarından GEMINI_API_KEY eklediğinden emin ol.</div>`;
+                document.getElementById('ai-loader').classList.add('hidden');
+                return;
+            }
+
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -405,6 +428,19 @@
 
         async function analyzeList() { await callGeminiAPI(`Bu listeyi analiz et: 1. Hangi eczane hangi görevi almış? 2. Birden fazla görevi olan var mı?\n\n` + getCurrentListData()); }
         async function askGemini() { const q = document.getElementById('userQuery').value; if (!q) return; await callGeminiAPI(`LİSTE:\n` + getCurrentListData() + `\n\nSORU: ${q}\nKısa ve net cevapla.`); }
+        function getCurrentListData() {
+            const container = document.getElementById('current-list-container');
+            if (!container) return "";
+            let listText = "Yozgat Eczacı Odası Güncel Sıralı Dağıtım Listesi:\n";
+            // Kart başlık ve içeriklerini topla
+            const cards = container.querySelectorAll('.border.rounded-xl');
+            cards.forEach(card => {
+                const header = card.querySelector('span.border')?.innerText || "";
+                const pharmacy = card.querySelector('.text-lg')?.innerText || "";
+                if(header && pharmacy) listText += `- ${header}: ${pharmacy}\n`;
+            });
+            return listText;
+        }
         document.getElementById('userQuery').addEventListener('keypress', function (e) { if (e.key === 'Enter') askGemini(); });
         
         renderUI(appData);
