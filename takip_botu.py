@@ -11,6 +11,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- AYARLAR ---
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
+KONTROL_ARALIGI_DAKIKA = 30  # <-- İŞTE BU SATIR EKSİKTİ, GERİ GELDİ!
 VERI_DOSYASI = "gecmis_kayitlar.json"
 RAPOR_DOSYASI = "index.html"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
@@ -134,68 +135,16 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
         function getTheme(headerText) {{
             const text = headerText.toUpperCase();
-            if (text.includes("MOR") || text.includes("TURUNCU")) return {{ 
-                card: "bg-gradient-to-br from-white to-orange-50 border-orange-200 hover:to-orange-100 border-l-orange-500", 
-                badge: "bg-orange-100 text-orange-800 border-orange-200", 
-                icon: "text-orange-500 bg-orange-50 group-hover:bg-orange-500 group-hover:text-white",
-                text: "text-orange-900 group-hover:text-orange-700"
-            }};
-            if (text.includes("ERİTROPOEİTİN") || text.includes("DARBEPOETİN")) return {{ 
-                card: "bg-gradient-to-br from-white to-blue-50 border-blue-200 hover:to-blue-100 border-l-blue-500", 
-                badge: "bg-blue-100 text-blue-800 border-blue-200", 
-                icon: "text-blue-500 bg-blue-50 group-hover:bg-blue-500 group-hover:text-white",
-                text: "text-blue-900 group-hover:text-blue-700"
-            }};
-            if (text.includes("DİYALİZ")) return {{ 
-                card: "bg-gradient-to-br from-white to-cyan-50 border-cyan-200 hover:to-cyan-100 border-l-cyan-500", 
-                badge: "bg-cyan-100 text-cyan-800 border-cyan-200", 
-                icon: "text-cyan-500 bg-cyan-50 group-hover:bg-cyan-500 group-hover:text-white",
-                text: "text-cyan-900 group-hover:text-cyan-700"
-            }};
-            if (text.includes("TÜP BEBEK")) return {{ 
-                card: "bg-gradient-to-br from-white to-pink-50 border-pink-200 hover:to-pink-100 border-l-pink-500", 
-                badge: "bg-pink-100 text-pink-800 border-pink-200", 
-                icon: "text-pink-500 bg-pink-50 group-hover:bg-pink-500 group-hover:text-white",
-                text: "text-pink-900 group-hover:text-pink-700"
-            }};
-            if (text.includes("CEZAEVİ")) return {{ 
-                card: "bg-gradient-to-br from-white to-red-50 border-red-200 hover:to-red-100 border-l-red-500", 
-                badge: "bg-red-100 text-red-800 border-red-200", 
-                icon: "text-red-500 bg-red-50 group-hover:bg-red-500 group-hover:text-white",
-                text: "text-red-900 group-hover:text-red-700"
-            }};
-            if (text.includes("KANAKINUMAB")) return {{ 
-                card: "bg-gradient-to-br from-white to-indigo-50 border-indigo-200 hover:to-indigo-100 border-l-indigo-500", 
-                badge: "bg-indigo-100 text-indigo-800 border-indigo-200", 
-                icon: "text-indigo-500 bg-indigo-50 group-hover:bg-indigo-500 group-hover:text-white",
-                text: "text-indigo-900 group-hover:text-indigo-700"
-            }};
-            if (text.includes("YATAN HASTA")) return {{ 
-                card: "bg-gradient-to-br from-white to-emerald-50 border-emerald-200 hover:to-emerald-100 border-l-emerald-500", 
-                badge: "bg-emerald-100 text-emerald-800 border-emerald-200", 
-                icon: "text-emerald-500 bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white",
-                text: "text-emerald-900 group-hover:text-emerald-700"
-            }};
-            if (text.includes("ANTİ-TNF")) return {{ 
-                card: "bg-gradient-to-br from-white to-teal-50 border-teal-200 hover:to-teal-100 border-l-teal-500", 
-                badge: "bg-teal-100 text-teal-800 border-teal-200", 
-                icon: "text-teal-500 bg-teal-50 group-hover:bg-teal-500 group-hover:text-white",
-                text: "text-teal-900 group-hover:text-teal-700"
-            }};
-            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return {{ 
-                card: "bg-gradient-to-br from-white to-violet-50 border-violet-200 hover:to-violet-100 border-l-violet-500", 
-                badge: "bg-violet-100 text-violet-800 border-violet-200", 
-                icon: "text-violet-500 bg-violet-50 group-hover:bg-violet-500 group-hover:text-white",
-                text: "text-violet-900 group-hover:text-violet-700"
-            }};
-
-            // Varsayılan
-            return {{ 
-                card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
-                badge: "bg-gray-100 text-gray-700 border-gray-200", 
-                icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white",
-                text: "text-gray-800 group-hover:text-gray-600"
-            }};
+            if (text.includes("MOR") || text.includes("TURUNCU")) return {{ card: "bg-gradient-to-br from-white to-orange-50 border-orange-200 hover:to-orange-100 border-l-orange-500", badge: "bg-orange-100 text-orange-800 border-orange-200", icon: "text-orange-500 bg-orange-50 group-hover:bg-orange-500 group-hover:text-white", text: "text-orange-900 group-hover:text-orange-700" }};
+            if (text.includes("ERİTROPOEİTİN") || text.includes("DARBEPOETİN")) return {{ card: "bg-gradient-to-br from-white to-blue-50 border-blue-200 hover:to-blue-100 border-l-blue-500", badge: "bg-blue-100 text-blue-800 border-blue-200", icon: "text-blue-500 bg-blue-50 group-hover:bg-blue-500 group-hover:text-white", text: "text-blue-900 group-hover:text-blue-700" }};
+            if (text.includes("DİYALİZ")) return {{ card: "bg-gradient-to-br from-white to-cyan-50 border-cyan-200 hover:to-cyan-100 border-l-cyan-500", badge: "bg-cyan-100 text-cyan-800 border-cyan-200", icon: "text-cyan-500 bg-cyan-50 group-hover:bg-cyan-500 group-hover:text-white", text: "text-cyan-900 group-hover:text-cyan-700" }};
+            if (text.includes("TÜP BEBEK")) return {{ card: "bg-gradient-to-br from-white to-pink-50 border-pink-200 hover:to-pink-100 border-l-pink-500", badge: "bg-pink-100 text-pink-800 border-pink-200", icon: "text-pink-500 bg-pink-50 group-hover:bg-pink-500 group-hover:text-white", text: "text-pink-900 group-hover:text-pink-700" }};
+            if (text.includes("CEZAEVİ")) return {{ card: "bg-gradient-to-br from-white to-red-50 border-red-200 hover:to-red-100 border-l-red-500", badge: "bg-red-100 text-red-800 border-red-200", icon: "text-red-500 bg-red-50 group-hover:bg-red-500 group-hover:text-white", text: "text-red-900 group-hover:text-red-700" }};
+            if (text.includes("KANAKINUMAB")) return {{ card: "bg-gradient-to-br from-white to-indigo-50 border-indigo-200 hover:to-indigo-100 border-l-indigo-500", badge: "bg-indigo-100 text-indigo-800 border-indigo-200", icon: "text-indigo-500 bg-indigo-50 group-hover:bg-indigo-500 group-hover:text-white", text: "text-indigo-900 group-hover:text-indigo-700" }};
+            if (text.includes("YATAN HASTA")) return {{ card: "bg-gradient-to-br from-white to-emerald-50 border-emerald-200 hover:to-emerald-100 border-l-emerald-500", badge: "bg-emerald-100 text-emerald-800 border-emerald-200", icon: "text-emerald-500 bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white", text: "text-emerald-900 group-hover:text-emerald-700" }};
+            if (text.includes("ANTİ-TNF")) return {{ card: "bg-gradient-to-br from-white to-teal-50 border-teal-200 hover:to-teal-100 border-l-teal-500", badge: "bg-teal-100 text-teal-800 border-teal-200", icon: "text-teal-500 bg-teal-50 group-hover:bg-teal-500 group-hover:text-white", text: "text-teal-900 group-hover:text-teal-700" }};
+            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return {{ card: "bg-gradient-to-br from-white to-violet-50 border-violet-200 hover:to-violet-100 border-l-violet-500", badge: "bg-violet-100 text-violet-800 border-violet-200", icon: "text-violet-500 bg-violet-50 group-hover:bg-violet-500 group-hover:text-white", text: "text-violet-900 group-hover:text-violet-700" }};
+            return {{ card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", badge: "bg-gray-100 text-gray-700 border-gray-200", icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white", text: "text-gray-800 group-hover:text-gray-600" }};
         }}
 
         function openFullHistoryModal() {{
@@ -325,32 +274,39 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
             for (let i = data.length - 1; i >= 0; i--) {{
                 const current = data[i];
-                const prev = i > 0 ? data[i-1] : null;
+                const prev = data[i-1];
+                
                 let title = "Değişiklik Tespit Edildi";
                 let color = "green";
                 let detailsHtml = "";
-
-                if (!prev) {{
-                    title = "Sistem Başlatıldı / Yedek Yüklendi";
-                    color = "gray";
-                    detailsHtml = '<p class="text-sm text-gray-600">İlk kayıt.</p>';
-                }} else if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {{
-                    continue; 
-                }} else {{
+                
+                if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {{ continue; }} 
+                else {{
                     const oldSet = new Set(prev.liste);
                     const newSet = new Set(current.liste);
                     const added = current.liste.filter(x => !oldSet.has(x));
                     const removed = prev.liste.filter(x => !newSet.has(x));
+                    
+                    if(added.length === 0 && removed.length === 0) continue;
+
                     detailsHtml += '<div class="grid grid-cols-1 gap-2 mt-2">';
-                    removed.forEach(item => {{ detailsHtml += `<div class="bg-red-50 p-2 rounded border border-red-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-red-100 text-red-600 flex items-center justify-center mr-2"><i class="fas fa-minus"></i></span><span class="line-through text-gray-500">${{item}}</span></div>`; }});
-                    added.forEach(item => {{ detailsHtml += `<div class="bg-green-50 p-2 rounded border border-green-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center mr-2"><i class="fas fa-plus"></i></span><span class="font-bold text-gray-800">${{item}}</span></div>`; }});
+                    removed.forEach(item => {{ 
+                        const p = parseItem(item); 
+                        detailsHtml += `<div class="bg-red-50 p-2 rounded border border-red-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-red-100 text-red-600 flex items-center justify-center mr-2 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-500 line-through">${{p.pharmacy}}</div></div></div>`; 
+                    }});
+                    added.forEach(item => {{ 
+                        const p = parseItem(item); 
+                        detailsHtml += `<div class="bg-green-50 p-2 rounded border border-green-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center mr-2 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="font-bold text-gray-800">${{p.pharmacy}}</div></div></div>`; 
+                    }});
                     detailsHtml += '</div>';
                 }}
-
                 const historyItem = document.createElement('div');
                 historyItem.className = 'ml-6 relative';
                 historyItem.innerHTML = `<div class="timeline-point bg-${{color}}-500"></div><div class="flex items-center mb-1"><span class="text-sm font-bold text-gray-900">${{current.tarih}}</span></div><div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"><p class="text-sm font-medium text-gray-800 mb-1">${{title}}</p>${{detailsHtml}}</div>`;
                 historyContainer.appendChild(historyItem);
+            }}
+            if(historyContainer.innerHTML === "") {{
+                historyContainer.innerHTML = '<div class="text-gray-400 text-sm italic p-4">Henüz bir değişiklik tespit edilmedi.</div>';
             }}
         }}
 
@@ -361,13 +317,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             reader.onload = function(e) {{
                 try {{
                     const json = JSON.parse(e.target.result);
-                    if (Array.isArray(json)) {{
-                        appData = json;
-                        // Yedek yüklenince sunucu saatini sıfırla ki yedeğin saati görünsün
-                        serverLastCheck = null;
-                        renderUI(appData);
-                        alert("Yedek başarıyla yüklendi!");
-                    }} else {{ alert("Hatalı format."); }}
+                    if (Array.isArray(json)) {{ appData = json; serverLastCheck = null; renderUI(appData); alert("Yedek yüklendi!"); }} 
+                    else {{ alert("Hatalı format."); }}
                 }} catch (error) {{ alert("Hata: " + error); }}
             }};
             reader.readAsText(file);
