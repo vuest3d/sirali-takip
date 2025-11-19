@@ -7,7 +7,6 @@ from datetime import datetime
 
 # --- AYARLAR ---
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
-KONTROL_ARALIGI_DAKIKA = 30
 VERI_DOSYASI = "gecmis_kayitlar.json"
 RAPOR_DOSYASI = "index.html"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
@@ -37,13 +36,17 @@ def veri_cek():
                 break
             
             if kayit_basladi and satir != "+":
+                # Eğer satırda "ECZANESİ" geçiyorsa, bu bir eczane ismidir.
+                # Hafızadaki görev adıyla birleştirip listeye ekleriz.
                 if "ECZANESİ" in satir.upper():
                     if gecici_gorev:
                         merkez_listesi.append(f"{gecici_gorev} {satir}")
-                        gecici_gorev = ""
+                        gecici_gorev = "" # Görevi kullandık, sıfırla
                     else:
+                        # Görev adı yakalanamadıysa sadece eczaneyi ekle
                         merkez_listesi.append(satir)
                 else:
+                    # Eczane değilse bu bir görev başlığıdır, hafızada tut.
                     gecici_gorev = satir
                     
         return merkez_listesi
@@ -52,7 +55,7 @@ def veri_cek():
         print(f"Hata oluştu: {e}")
         return None
 
-def html_sablonu_olustur(tum_veriler_json):
+def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
     # CSS Kodu
     css_kodu = """
     <style>
@@ -72,119 +75,122 @@ def html_sablonu_olustur(tum_veriler_json):
     """
 
     # JS Kodu
-    js_kodu = """
+    js_kodu = f"""
     <script>
-        function manualRefresh() { 
+        // Python'dan gelen güncel kontrol saati
+        let serverLastCheck = "{son_kontrol_tarihi}";
+
+        function manualRefresh() {{ 
             const url = window.location.href.split('?')[0];
             const timeStamp = new Date().getTime();
             window.location.href = url + '?v=' + timeStamp;
-        }
+        }}
 
-        function parseItem(text) {
+        function parseItem(text) {{
             const regex = /^(.*?)(\S+\s+ECZANESİ)$/i;
             const match = text.match(regex);
-            if (match) return { header: match[1].trim(), pharmacy: match[2].trim() };
-            return { header: "GENEL DAĞITIM", pharmacy: text };
-        }
+            if (match) return {{ header: match[1].trim(), pharmacy: match[2].trim() }};
+            return {{ header: "GENEL DAĞITIM", pharmacy: text }};
+        }}
 
-        function getTheme(headerText) {
+        function getTheme(headerText) {{
             const text = headerText.toUpperCase();
-            if (text.includes("MOR") || text.includes("TURUNCU")) return { 
+            if (text.includes("MOR") || text.includes("TURUNCU")) return {{ 
                 card: "bg-gradient-to-br from-white to-orange-50 border-orange-200 hover:to-orange-100 border-l-orange-500", 
                 badge: "bg-orange-100 text-orange-800 border-orange-200", 
                 icon: "text-orange-500 bg-orange-50 group-hover:bg-orange-500 group-hover:text-white",
                 text: "text-orange-900 group-hover:text-orange-700"
-            };
-            if (text.includes("ERİTROPOEİTİN") || text.includes("DARBEPOETİN")) return { 
+            }};
+            if (text.includes("ERİTROPOEİTİN") || text.includes("DARBEPOETİN")) return {{ 
                 card: "bg-gradient-to-br from-white to-blue-50 border-blue-200 hover:to-blue-100 border-l-blue-500", 
                 badge: "bg-blue-100 text-blue-800 border-blue-200", 
                 icon: "text-blue-500 bg-blue-50 group-hover:bg-blue-500 group-hover:text-white",
                 text: "text-blue-900 group-hover:text-blue-700"
-            };
-            if (text.includes("DİYALİZ")) return { 
+            }};
+            if (text.includes("DİYALİZ")) return {{ 
                 card: "bg-gradient-to-br from-white to-cyan-50 border-cyan-200 hover:to-cyan-100 border-l-cyan-500", 
                 badge: "bg-cyan-100 text-cyan-800 border-cyan-200", 
                 icon: "text-cyan-500 bg-cyan-50 group-hover:bg-cyan-500 group-hover:text-white",
                 text: "text-cyan-900 group-hover:text-cyan-700"
-            };
-            if (text.includes("TÜP BEBEK")) return { 
+            }};
+            if (text.includes("TÜP BEBEK")) return {{ 
                 card: "bg-gradient-to-br from-white to-pink-50 border-pink-200 hover:to-pink-100 border-l-pink-500", 
                 badge: "bg-pink-100 text-pink-800 border-pink-200", 
                 icon: "text-pink-500 bg-pink-50 group-hover:bg-pink-500 group-hover:text-white",
                 text: "text-pink-900 group-hover:text-pink-700"
-            };
-            if (text.includes("CEZAEVİ")) return { 
+            }};
+            if (text.includes("CEZAEVİ")) return {{ 
                 card: "bg-gradient-to-br from-white to-red-50 border-red-200 hover:to-red-100 border-l-red-500", 
                 badge: "bg-red-100 text-red-800 border-red-200", 
                 icon: "text-red-500 bg-red-50 group-hover:bg-red-500 group-hover:text-white",
                 text: "text-red-900 group-hover:text-red-700"
-            };
-            if (text.includes("KANAKINUMAB")) return { 
+            }};
+            if (text.includes("KANAKINUMAB")) return {{ 
                 card: "bg-gradient-to-br from-white to-indigo-50 border-indigo-200 hover:to-indigo-100 border-l-indigo-500", 
                 badge: "bg-indigo-100 text-indigo-800 border-indigo-200", 
                 icon: "text-indigo-500 bg-indigo-50 group-hover:bg-indigo-500 group-hover:text-white",
                 text: "text-indigo-900 group-hover:text-indigo-700"
-            };
-            if (text.includes("YATAN HASTA")) return { 
+            }};
+            if (text.includes("YATAN HASTA")) return {{ 
                 card: "bg-gradient-to-br from-white to-emerald-50 border-emerald-200 hover:to-emerald-100 border-l-emerald-500", 
                 badge: "bg-emerald-100 text-emerald-800 border-emerald-200", 
                 icon: "text-emerald-500 bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white",
                 text: "text-emerald-900 group-hover:text-emerald-700"
-            };
-            if (text.includes("ANTİ-TNF")) return { 
+            }};
+            if (text.includes("ANTİ-TNF")) return {{ 
                 card: "bg-gradient-to-br from-white to-teal-50 border-teal-200 hover:to-teal-100 border-l-teal-500", 
                 badge: "bg-teal-100 text-teal-800 border-teal-200", 
                 icon: "text-teal-500 bg-teal-50 group-hover:bg-teal-500 group-hover:text-white",
                 text: "text-teal-900 group-hover:text-teal-700"
-            };
-            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return { 
+            }};
+            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return {{ 
                 card: "bg-gradient-to-br from-white to-violet-50 border-violet-200 hover:to-violet-100 border-l-violet-500", 
                 badge: "bg-violet-100 text-violet-800 border-violet-200", 
                 icon: "text-violet-500 bg-violet-50 group-hover:bg-violet-500 group-hover:text-white",
                 text: "text-violet-900 group-hover:text-violet-700"
-            };
+            }};
 
-            return { 
+            return {{ 
                 card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
                 badge: "bg-gray-100 text-gray-700 border-gray-200", 
                 icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white",
                 text: "text-gray-800 group-hover:text-gray-600"
-            };
-        }
+            }};
+        }}
 
-        function openFullHistoryModal() {
+        function openFullHistoryModal() {{
             document.getElementById('full-history-modal').classList.remove('hidden');
             switchHistoryTab('changes'); 
-        }
+        }}
 
-        function closeFullHistoryModal() { document.getElementById('full-history-modal').classList.add('hidden'); }
+        function closeFullHistoryModal() {{ document.getElementById('full-history-modal').classList.add('hidden'); }}
 
-        function switchHistoryTab(tabName) {
+        function switchHistoryTab(tabName) {{
             const contentArea = document.getElementById('history-content-area');
             const tabChanges = document.getElementById('tab-changes');
             const tabSnapshots = document.getElementById('tab-snapshots');
 
-            if(tabName === 'changes') {
+            if(tabName === 'changes') {{
                 tabChanges.className = 'py-4 px-6 tab-active transition-colors flex items-center gap-2';
                 tabSnapshots.className = 'py-4 px-6 tab-inactive transition-colors flex items-center gap-2';
                 contentArea.innerHTML = renderChangesView();
-            } else {
+            }} else {{
                 tabChanges.className = 'py-4 px-6 tab-inactive transition-colors flex items-center gap-2';
                 tabSnapshots.className = 'py-4 px-6 tab-active transition-colors flex items-center gap-2';
                 contentArea.innerHTML = renderSnapshotsView();
-            }
-        }
+            }}
+        }}
 
-        function renderChangesView() {
+        function renderChangesView() {{
             let html = '<div class="space-y-6">';
-            for (let i = 0; i < appData.length; i++) {
+            for (let i = 0; i < appData.length; i++) {{
                 const current = appData[i];
                 const prev = (i + 1 < appData.length) ? appData[i+1] : null;
                 
                 let changesHtml = '';
-                if (!prev) {
+                if (!prev) {{
                     changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>';
-                } else {
+                }} else {{
                     const currentSet = new Set(current.liste);
                     const prevSet = new Set(prev.liste);
                     const added = current.liste.filter(x => !prevSet.has(x));
@@ -192,157 +198,168 @@ def html_sablonu_olustur(tum_veriler_json):
                     if (added.length === 0 && removed.length === 0) continue; 
 
                     changesHtml += '<div class="grid grid-cols-1 gap-2">';
-                    removed.forEach(item => {
+                    removed.forEach(item => {{
                         const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski Sıradaki Eczane</div><div class="text-gray-700 line-through text-sm"><span class="font-semibold">${p.header}:</span> ${p.pharmacy}</div></div></div>`;
-                    });
-                    added.forEach(item => {
+                        changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski Sıradaki Eczane</div><div class="text-gray-700 line-through text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
+                    }});
+                    added.forEach(item => {{
                         const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni Sıradaki Eczane</div><div class="text-gray-800 text-sm"><span class="font-semibold">${p.header}:</span> ${p.pharmacy}</div></div></div>`;
-                    });
+                        changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni Sıradaki Eczane</div><div class="text-gray-800 text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
+                    }});
                     changesHtml += '</div>';
-                }
-                html += `<div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-3 h-3 bg-blue-500 rounded-full mt-2"></div><div class="w-0.5 bg-gray-200 h-full mt-1"></div></div><div class="flex-grow pb-6"><span class="text-sm font-bold text-gray-900 bg-white border px-2 py-1 rounded shadow-sm">${current.tarih}</span><div class="mt-3 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">${changesHtml}</div></div></div>`;
-            }
+                }}
+                html += `<div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-3 h-3 bg-blue-500 rounded-full mt-2"></div><div class="w-0.5 bg-gray-200 h-full mt-1"></div></div><div class="flex-grow pb-6"><span class="text-sm font-bold text-gray-900 bg-white border px-2 py-1 rounded shadow-sm">${{current.tarih}}</span><div class="mt-3 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">${{changesHtml}}</div></div></div>`;
+            }}
             html += '</div>';
             return html;
-        }
+        }}
 
-        function renderSnapshotsView() {
+        function renderSnapshotsView() {{
             let html = '<div class="grid grid-cols-1 gap-6">';
-            appData.forEach((record, index) => {
-                html += `<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-calendar-alt"></i> ${record.tarih}</span><span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${record.liste.length} Kayıt</span></div><div class="p-4 max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">${record.liste.map(item => { const p = parseItem(item); return `<div class="text-sm border p-2 rounded hover:bg-gray-50"><span class="text-gray-500 text-xs block">${p.header}</span><span class="font-semibold text-gray-800">${p.pharmacy}</span></div>`; }).join('')}</div></div>`;
-            });
+            appData.forEach((record, index) => {{
+                html += `<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-calendar-alt"></i> ${{record.tarih}}</span><span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${{record.liste.length}} Kayıt</span></div><div class="p-4 max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">${{record.liste.map(item => {{ const p = parseItem(item); return `<div class="text-sm border p-2 rounded hover:bg-gray-50"><span class="text-gray-500 text-xs block">${{p.header}}</span><span class="font-semibold text-gray-800">${{p.pharmacy}}</span></div>`; }}).join('')}}</div></div>`;
+            }});
             html += '</div>';
             return html;
-        }
+        }}
 
-        function showHistory(targetHeader) {
+        function showHistory(targetHeader) {{
             const historyList = [];
-            appData.forEach(record => {
+            appData.forEach(record => {{
                 const foundItem = record.liste.find(item => parseItem(item).header === targetHeader);
-                if (foundItem) {
+                if (foundItem) {{
                     const parsed = parseItem(foundItem);
-                    historyList.push({ date: record.tarih, pharmacy: parsed.pharmacy });
-                }
-            });
+                    historyList.push({{ date: record.tarih, pharmacy: parsed.pharmacy }});
+                }}
+            }});
 
             document.getElementById('modal-title').innerText = targetHeader;
             const contentDiv = document.getElementById('modal-content');
             
             let html = '';
-            if(historyList.length === 0) {
+            if(historyList.length === 0) {{
                 html = '<div class="p-8 text-center text-gray-500">Bu görev için geçmiş kayıt bulunamadı.</div>';
-            } else {
+            }} else {{
                 html = '<div class="divide-y divide-gray-200 bg-white border-b">';
-                historyList.forEach((h, index) => {
+                historyList.forEach((h, index) => {{
                     const isLatest = index === 0;
-                    html += `<div class="flex items-center p-4 hover:bg-blue-50 transition-colors ${isLatest ? 'bg-blue-50' : ''}"><div class="w-36 flex-shrink-0 flex flex-col"><span class="text-xs font-bold text-gray-400 uppercase">Tarih</span><span class="text-sm font-mono text-gray-600">${h.date}</span></div><div class="flex-grow border-l border-gray-200 pl-4 ml-2"><div class="text-xs font-bold text-gray-400 uppercase mb-0.5">Sıradaki Eczane</div><div class="text-lg font-bold ${isLatest ? 'text-blue-600' : 'text-gray-800'}">${h.pharmacy}${isLatest ? '<span class="ml-2 inline-block bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full align-middle">GÜNCEL</span>' : ''}</div></div></div>`;
-                });
+                    html += `<div class="flex items-center p-4 hover:bg-blue-50 transition-colors ${{isLatest ? 'bg-blue-50' : ''}}"><div class="w-36 flex-shrink-0 flex flex-col"><span class="text-xs font-bold text-gray-400 uppercase">Tarih</span><span class="text-sm font-mono text-gray-600">${{h.date}}</span></div><div class="flex-grow border-l border-gray-200 pl-4 ml-2"><div class="text-xs font-bold text-gray-400 uppercase mb-0.5">Sıradaki Eczane</div><div class="text-lg font-bold ${{isLatest ? 'text-blue-600' : 'text-gray-800'}}">${{h.pharmacy}}${{isLatest ? '<span class="ml-2 inline-block bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full align-middle">GÜNCEL</span>' : ''}}</div></div></div>`;
+                }});
                 html += '</div>';
-            }
+            }}
             contentDiv.innerHTML = html;
             document.getElementById('history-modal').classList.remove('hidden');
-        }
+        }}
 
-        function closeModal() { document.getElementById('history-modal').classList.add('hidden'); }
+        function closeModal() {{ document.getElementById('history-modal').classList.add('hidden'); }}
 
-        function renderUI(data) {
+        function renderUI(data) {{
             if (!data || data.length === 0) return;
             const lastRecord = data[data.length - 1];
-            document.getElementById('last-check-display').innerText = lastRecord.tarih;
+            
+            // Sunucudan gelen güncel saat varsa onu, yoksa kayıt tarihini kullan
+            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{
+                document.getElementById('last-check-display').innerText = serverLastCheck;
+            }} else {{
+                document.getElementById('last-check-display').innerText = lastRecord.tarih;
+            }}
+            
             const listContainer = document.getElementById('current-list-container');
             listContainer.innerHTML = '';
             document.getElementById('count-display').innerText = lastRecord.liste.length + ' Kayıt';
 
-            lastRecord.liste.forEach(item => {
+            lastRecord.liste.forEach(item => {{
                 const parsed = parseItem(item);
                 const theme = getTheme(parsed.header);
                 const el = document.createElement('div');
-                el.className = `border rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-l-4 group cursor-pointer active:scale-[0.98] select-none ${theme.card}`;
+                el.className = `border rounded-xl p-4 shadow-sm hover:shadow-md transition-all border-l-4 group cursor-pointer active:scale-[0.98] select-none ${{theme.card}}`;
                 const safeHeader = parsed.header.replace(/'/g, "\\'");
-                el.setAttribute('onclick', `showHistory('${safeHeader}')`);
-                el.innerHTML = `<div class="flex justify-between items-start"><div class="w-full"><div class="mb-2"><span class="${theme.badge} border px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide inline-block shadow-sm">${parsed.header}</span></div><div class="text-lg font-bold ${theme.text} transition-colors pl-1">${parsed.pharmacy}</div></div><div class="ml-3 flex-shrink-0 pt-1"><div class="w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${theme.icon}"><i class="fas fa-history"></i></div></div></div>`;
+                el.setAttribute('onclick', `showHistory('${{safeHeader}}')`);
+                el.innerHTML = `<div class="flex justify-between items-start"><div class="w-full"><div class="mb-2"><span class="${{theme.badge}} border px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide inline-block shadow-sm">${{parsed.header}}</span></div><div class="text-lg font-bold ${{theme.text}} transition-colors pl-1">${{parsed.pharmacy}}</div></div><div class="ml-3 flex-shrink-0 pt-1"><div class="w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${{theme.icon}}"><i class="fas fa-history"></i></div></div></div>`;
                 listContainer.appendChild(el);
-            });
+            }});
 
             const historyContainer = document.getElementById('history-container');
             historyContainer.innerHTML = '';
 
-            for (let i = data.length - 1; i >= 0; i--) {
+            for (let i = data.length - 1; i >= 0; i--) {{
                 const current = data[i];
                 const prev = i > 0 ? data[i-1] : null;
                 let title = "Değişiklik Tespit Edildi";
                 let color = "green";
                 let detailsHtml = "";
 
-                if (!prev) {
+                if (!prev) {{
                     title = "Sistem Başlatıldı / Yedek Yüklendi";
                     color = "gray";
                     detailsHtml = '<p class="text-sm text-gray-600">İlk kayıt.</p>';
-                } else if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {
+                }} else if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {{
                     continue; 
-                } else {
+                }} else {{
                     const oldSet = new Set(prev.liste);
                     const newSet = new Set(current.liste);
                     const added = current.liste.filter(x => !oldSet.has(x));
                     const removed = prev.liste.filter(x => !newSet.has(x));
                     detailsHtml += '<div class="grid grid-cols-1 gap-2 mt-2">';
-                    removed.forEach(item => { detailsHtml += `<div class="bg-red-50 p-2 rounded border border-red-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-red-100 text-red-600 flex items-center justify-center mr-2"><i class="fas fa-minus"></i></span><span class="line-through text-gray-500">${item}</span></div>`; });
-                    added.forEach(item => { detailsHtml += `<div class="bg-green-50 p-2 rounded border border-green-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center mr-2"><i class="fas fa-plus"></i></span><span class="font-bold text-gray-800">${item}</span></div>`; });
+                    removed.forEach(item => {{ detailsHtml += `<div class="bg-red-50 p-2 rounded border border-red-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-red-100 text-red-600 flex items-center justify-center mr-2"><i class="fas fa-minus"></i></span><span class="line-through text-gray-500">${{item}}</span></div>`; }});
+                    added.forEach(item => {{ detailsHtml += `<div class="bg-green-50 p-2 rounded border border-green-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center mr-2"><i class="fas fa-plus"></i></span><span class="font-bold text-gray-800">${{item}}</span></div>`; }});
                     detailsHtml += '</div>';
-                }
+                }}
 
                 const historyItem = document.createElement('div');
                 historyItem.className = 'ml-6 relative';
-                historyItem.innerHTML = `<div class="timeline-point bg-${color}-500"></div><div class="flex items-center mb-1"><span class="text-sm font-bold text-gray-900">${current.tarih}</span></div><div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"><p class="text-sm font-medium text-gray-800 mb-1">${title}</p>${detailsHtml}</div>`;
+                historyItem.innerHTML = `<div class="timeline-point bg-${{color}}-500"></div><div class="flex items-center mb-1"><span class="text-sm font-bold text-gray-900">${{current.tarih}}</span></div><div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"><p class="text-sm font-medium text-gray-800 mb-1">${{title}}</p>${{detailsHtml}}</div>`;
                 historyContainer.appendChild(historyItem);
-            }
-        }
+            }}
+        }}
 
-        function handleFileUpload(input) {
+        function handleFileUpload(input) {{
             const file = input.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
+            reader.onload = function(e) {{
+                try {{
                     const json = JSON.parse(e.target.result);
-                    if (Array.isArray(json)) {
-                        appData = json; renderUI(appData); alert("Yedek başarıyla yüklendi!");
-                    } else { alert("Hatalı format."); }
-                } catch (error) { alert("Hata: " + error); }
-            };
+                    if (Array.isArray(json)) {{
+                        appData = json;
+                        // Yedek yüklenince sunucu saatini sıfırla ki yedeğin saati görünsün
+                        serverLastCheck = null;
+                        renderUI(appData);
+                        alert("Yedek başarıyla yüklendi!");
+                    }} else {{ alert("Hatalı format."); }}
+                }} catch (error) {{ alert("Hata: " + error); }}
+            }};
             reader.readAsText(file);
-        }
-        function downloadCSV() {
+        }}
+        function downloadCSV() {{
             let csvContent = "\\uFEFFTarih,Liste İçeriği\\n"; 
-            appData.forEach(record => { record.liste.forEach(item => { let cleanItem = item.replace(/"/g, '""'); csvContent += `"${record.tarih}","${cleanItem}"\n`; }); });
-            saveFile(new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }), "dagitim_gecmisi.csv");
-        }
-        function downloadJSON() { saveFile(new Blob([JSON.stringify(appData, null, 4)], { type: 'application/json' }), "dagitim_yedek.json"); }
-        function saveFile(blob, filename) { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", filename); document.body.appendChild(link); link.click(); document.body.removeChild(link); }
+            appData.forEach(record => {{ record.liste.forEach(item => {{ let cleanItem = item.replace(/"/g, '""'); csvContent += `"${{record.tarih}}","${{cleanItem}}"\\n`; }}); }});
+            saveFile(new Blob([csvContent], {{ type: 'text/csv;charset=utf-8;' }}), "dagitim_gecmisi.csv");
+        }}
+        function downloadJSON() {{ saveFile(new Blob([JSON.stringify(appData, null, 4)], {{ type: 'application/json' }}), "dagitim_yedek.json"); }}
+        function saveFile(blob, filename) {{ const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", filename); document.body.appendChild(link); link.click(); document.body.removeChild(link); }}
         
-        function toggleResponseArea(show) { const el = document.getElementById('ai-response-container'); if(show) { el.classList.remove('hidden'); document.getElementById('ai-loader').classList.remove('hidden'); document.getElementById('ai-result').innerHTML = ''; } else { document.getElementById('ai-loader').classList.add('hidden'); } }
+        function toggleResponseArea(show) {{ const el = document.getElementById('ai-response-container'); if(show) {{ el.classList.remove('hidden'); document.getElementById('ai-loader').classList.remove('hidden'); document.getElementById('ai-result').innerHTML = ''; }} else {{ document.getElementById('ai-loader').classList.add('hidden'); }} }}
         
-        async function callGeminiAPI(prompt) {
+        async function callGeminiAPI(prompt) {{
             toggleResponseArea(true);
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-                });
+            try {{
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${{apiKey}}`, {{
+                    method: 'POST', headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ contents: [{{ parts: [{{ text: prompt }}] }}] }})
+                }});
                 const data = await response.json();
                 if (data.error) throw new Error(data.error.message);
                 const aiText = data.candidates[0].content.parts[0].text;
                 document.getElementById('ai-result').innerHTML = marked.parse(aiText);
-            } catch (error) {
-                document.getElementById('ai-result').innerHTML = `<span class="text-red-500">Hata: ${error.message}</span>`;
-            } finally { document.getElementById('ai-loader').classList.add('hidden'); }
-        }
+            }} catch (error) {{
+                document.getElementById('ai-result').innerHTML = `<span class="text-red-500">Hata: ${{error.message}}</span>`;
+            }} finally {{ document.getElementById('ai-loader').classList.add('hidden'); }}
+        }}
 
-        async function analyzeList() { await callGeminiAPI(`Bu listeyi analiz et: 1. Hangi eczane hangi görevi almış? 2. Birden fazla görevi olan var mı?\\n\\n` + getCurrentListData()); }
-        async function askGemini() { const q = document.getElementById('userQuery').value; if (!q) return; await callGeminiAPI(`LİSTE:\\n` + getCurrentListData() + `\\n\\nSORU: ${q}\\nKısa ve net cevapla.`); }
-        document.getElementById('userQuery').addEventListener('keypress', function (e) { if (e.key === 'Enter') askGemini(); });
+        async function analyzeList() {{ await callGeminiAPI(`Bu listeyi analiz et: 1. Hangi eczane hangi görevi almış? 2. Birden fazla görevi olan var mı?\\n\\n` + getCurrentListData()); }}
+        async function askGemini() {{ const q = document.getElementById('userQuery').value; if (!q) return; await callGeminiAPI(`LİSTE:\\n` + getCurrentListData() + `\\n\\nSORU: ${{q}}\\nKısa ve net cevapla.`); }}
+        document.getElementById('userQuery').addEventListener('keypress', function (e) {{ if (e.key === 'Enter') askGemini(); }});
         
         renderUI(appData);
     </script>
@@ -478,7 +495,9 @@ def html_sablonu_olustur(tum_veriler_json):
 def rapor_olustur(gecmis_veriler):
     """Verileri kullanarak HTML raporu oluşturur."""
     tum_veriler_json = json.dumps(gecmis_veriler, ensure_ascii=False)
-    full_html = html_sablonu_olustur(tum_veriler_json)
+    # GÜNCELLEME: Anlık saati HTML oluşturucuya gönderiyoruz
+    son_kontrol_tarihi = datetime.now().strftime("%d.%m.%Y %H:%M")
+    full_html = html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi)
     
     with open(RAPOR_DOSYASI, "w", encoding="utf-8") as f:
         f.write(full_html)
@@ -515,9 +534,11 @@ def main():
                 gecmis_veriler.append(kayit)
                 with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
                     json.dump(gecmis_veriler, f, ensure_ascii=False, indent=4)
+                # Güncelleme olunca yeni saatle raporu oluştur
                 rapor_olustur(gecmis_veriler)
             else:
                 print("Değişiklik yok. Rapor arayüzü yenileniyor...")
+                # Güncelleme OLMASA BİLE yeni saatle raporu oluştur (Bu kısım tarihi günceller)
                 rapor_olustur(gecmis_veriler)
         else:
             print("Veri çekilemedi.")
