@@ -7,10 +7,9 @@ from datetime import datetime
 
 # --- AYARLAR ---
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
-KONTROL_ARALIGI_DAKIKA = 30  # <-- İşte bu eksik satır geri geldi!
+KONTROL_ARALIGI_DAKIKA = 30
 VERI_DOSYASI = "gecmis_kayitlar.json"
 RAPOR_DOSYASI = "index.html"
-# GitHub Actions ortamında API Key environment variable'dan alınır
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
 
 def veri_cek():
@@ -19,7 +18,7 @@ def veri_cek():
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        response = requests.get(URL, headers=headers, timeout=20)
+        response = requests.get(URL, headers=headers, timeout=30)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.content, "html.parser")
@@ -31,10 +30,11 @@ def veri_cek():
         kayit_basladi = False
         
         for satir in satirlar:
-            if satir == "MERKEZ":
+            if "MERKEZ" in satir and len(satir) < 20:
                 kayit_basladi = True
                 continue
-            if satir == "AKDAĞMADENİ" and kayit_basladi:
+            
+            if "AKDAĞMADENİ" in satir and kayit_basladi:
                 break
             
             if kayit_basladi and satir != "+":
@@ -46,8 +46,9 @@ def veri_cek():
                         merkez_listesi.append(satir)
                 else:
                     gecici_gorev = satir
-                    
-        return merkez_listesi
+        
+        temiz_liste = [x for x in merkez_listesi if len(x) > 5]
+        return temiz_liste
 
     except Exception as e:
         print(f"Hata oluştu: {e}")
@@ -75,9 +76,7 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
     # JS Kodu
     js_kodu = f"""
     <script>
-        // Python'dan gelen güncel kontrol saati
         let serverLastCheck = "{son_kontrol_tarihi}";
-        // Python'dan gelen API Anahtarı (Eğer yoksa boş gelir)
         const apiKey = "{GEMINI_API_KEY}";
 
         function manualRefresh() {{ 
@@ -150,7 +149,6 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
                 text: "text-violet-900 group-hover:text-violet-700"
             }};
 
-            // Varsayılan
             return {{ 
                 card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
                 badge: "bg-gray-100 text-gray-700 border-gray-200", 
@@ -170,7 +168,6 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             const contentArea = document.getElementById('history-content-area');
             const tabChanges = document.getElementById('tab-changes');
             const tabSnapshots = document.getElementById('tab-snapshots');
-
             if(tabName === 'changes') {{
                 tabChanges.className = 'py-4 px-6 tab-active transition-colors flex items-center gap-2';
                 tabSnapshots.className = 'py-4 px-6 tab-inactive transition-colors flex items-center gap-2';
@@ -184,65 +181,49 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
         function renderChangesView() {{
             let html = '<div class="space-y-6">';
-            for (let i = 0; i < appData.length; i++) {{
+            for (let i = appData.length - 1; i >= 0; i--) {{
                 const current = appData[i];
-                const prev = (i + 1 < appData.length) ? appData[i+1] : null;
-                
+                const prev = (i > 0) ? appData[i-1] : null;
                 let changesHtml = '';
-                if (!prev) {{
-                    changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>';
-                }} else {{
+                if (!prev) {{ changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>'; }} 
+                else {{
                     const currentSet = new Set(current.liste);
                     const prevSet = new Set(prev.liste);
                     const added = current.liste.filter(x => !prevSet.has(x));
                     const removed = prev.liste.filter(x => !currentSet.has(x));
                     if (added.length === 0 && removed.length === 0) continue; 
-
                     changesHtml += '<div class="grid grid-cols-1 gap-2">';
-                    removed.forEach(item => {{
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski Sıradaki Eczane</div><div class="text-gray-700 line-through text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
-                    }});
-                    added.forEach(item => {{
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni Sıradaki Eczane</div><div class="text-gray-800 text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
-                    }});
+                    removed.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-500 line-through">${{p.pharmacy}}</div></div></div>`; }});
+                    added.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="font-bold text-gray-800">${{p.pharmacy}}</div></div></div>`; }});
                     changesHtml += '</div>';
                 }}
                 html += `<div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-3 h-3 bg-blue-500 rounded-full mt-2"></div><div class="w-0.5 bg-gray-200 h-full mt-1"></div></div><div class="flex-grow pb-6"><span class="text-sm font-bold text-gray-900 bg-white border px-2 py-1 rounded shadow-sm">${{current.tarih}}</span><div class="mt-3 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">${{changesHtml}}</div></div></div>`;
             }}
-            html += '</div>';
-            return html;
+            html += '</div>'; return html;
         }}
 
         function renderSnapshotsView() {{
             let html = '<div class="grid grid-cols-1 gap-6">';
-            appData.forEach((record, index) => {{
+            for (let i = appData.length - 1; i >= 0; i--) {{
+                const record = appData[i];
                 html += `<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-calendar-alt"></i> ${{record.tarih}}</span><span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${{record.liste.length}} Kayıt</span></div><div class="p-4 max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">${{record.liste.map(item => {{ const p = parseItem(item); return `<div class="text-sm border p-2 rounded hover:bg-gray-50"><span class="text-gray-500 text-xs block">${{p.header}}</span><span class="font-semibold text-gray-800">${{p.pharmacy}}</span></div>`; }}).join('')}}</div></div>`;
-            }});
-            html += '</div>';
-            return html;
+            }}
+            html += '</div>'; return html;
         }}
 
         function showHistory(targetHeader) {{
             const historyList = [];
             appData.forEach(record => {{
                 const foundItem = record.liste.find(item => parseItem(item).header === targetHeader);
-                if (foundItem) {{
-                    const parsed = parseItem(foundItem);
-                    historyList.push({{ date: record.tarih, pharmacy: parsed.pharmacy }});
-                }}
+                if (foundItem) {{ const parsed = parseItem(foundItem); historyList.push({{ date: record.tarih, pharmacy: parsed.pharmacy }}); }}
             }});
-
             document.getElementById('modal-title').innerText = targetHeader;
             const contentDiv = document.getElementById('modal-content');
-            
             let html = '';
-            if(historyList.length === 0) {{
-                html = '<div class="p-8 text-center text-gray-500">Bu görev için geçmiş kayıt bulunamadı.</div>';
-            }} else {{
+            if(historyList.length === 0) {{ html = '<div class="p-8 text-center text-gray-500">Kayıt yok.</div>'; }} 
+            else {{
                 html = '<div class="divide-y divide-gray-200 bg-white border-b">';
-                historyList.forEach((h, index) => {{
+                historyList.reverse().forEach((h, index) => {{
                     const isLatest = index === 0;
                     html += `<div class="flex items-center p-4 hover:bg-blue-50 transition-colors ${{isLatest ? 'bg-blue-50' : ''}}"><div class="w-36 flex-shrink-0 flex flex-col"><span class="text-xs font-bold text-gray-400 uppercase">Tarih</span><span class="text-sm font-mono text-gray-600">${{h.date}}</span></div><div class="flex-grow border-l border-gray-200 pl-4 ml-2"><div class="text-xs font-bold text-gray-400 uppercase mb-0.5">Sıradaki Eczane</div><div class="text-lg font-bold ${{isLatest ? 'text-blue-600' : 'text-gray-800'}}">${{h.pharmacy}}${{isLatest ? '<span class="ml-2 inline-block bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full align-middle">GÜNCEL</span>' : ''}}</div></div></div>`;
                 }});
@@ -258,11 +239,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             if (!data || data.length === 0) return;
             const lastRecord = data[data.length - 1];
             
-            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{
-                document.getElementById('last-check-display').innerText = serverLastCheck;
-            }} else {{
-                document.getElementById('last-check-display').innerText = lastRecord.tarih;
-            }}
+            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{ document.getElementById('last-check-display').innerText = serverLastCheck; }} 
+            else {{ document.getElementById('last-check-display').innerText = lastRecord.tarih; }}
             
             const listContainer = document.getElementById('current-list-container');
             listContainer.innerHTML = '';
@@ -282,30 +260,34 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             const historyContainer = document.getElementById('history-container');
             historyContainer.innerHTML = '';
 
-            for (let i = data.length - 1; i >= 0; i--) {{
+            for (let i = data.length - 1; i > 0; i--) {{
                 const current = data[i];
-                const prev = i > 0 ? data[i-1] : null;
+                const prev = data[i-1];
+                
                 let title = "Değişiklik Tespit Edildi";
                 let color = "green";
                 let detailsHtml = "";
-
-                if (!prev) {{
-                    title = "Sistem Başlatıldı / Yedek Yüklendi";
-                    color = "gray";
-                    detailsHtml = '<p class="text-sm text-gray-600">İlk kayıt.</p>';
-                }} else if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {{
-                    continue; 
-                }} else {{
+                
+                if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {{ continue; }} 
+                else {{
                     const oldSet = new Set(prev.liste);
                     const newSet = new Set(current.liste);
                     const added = current.liste.filter(x => !oldSet.has(x));
                     const removed = prev.liste.filter(x => !newSet.has(x));
+                    
+                    if(added.length === 0 && removed.length === 0) continue;
+
                     detailsHtml += '<div class="grid grid-cols-1 gap-2 mt-2">';
-                    removed.forEach(item => {{ detailsHtml += `<div class="bg-red-50 p-2 rounded border border-red-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-red-100 text-red-600 flex items-center justify-center mr-2"><i class="fas fa-minus"></i></span><span class="line-through text-gray-500">${{item}}</span></div>`; }});
-                    added.forEach(item => {{ detailsHtml += `<div class="bg-green-50 p-2 rounded border border-green-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center mr-2"><i class="fas fa-plus"></i></span><span class="font-bold text-gray-800">${{item}}</span></div>`; }});
+                    removed.forEach(item => {{ 
+                        const p = parseItem(item); 
+                        detailsHtml += `<div class="bg-red-50 p-2 rounded border border-red-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-red-100 text-red-600 flex items-center justify-center mr-2 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-500 line-through">${{p.pharmacy}}</div></div></div>`; 
+                    }});
+                    added.forEach(item => {{ 
+                        const p = parseItem(item); 
+                        detailsHtml += `<div class="bg-green-50 p-2 rounded border border-green-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center mr-2 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="font-bold text-gray-800">${{p.pharmacy}}</div></div></div>`; 
+                    }});
                     detailsHtml += '</div>';
                 }}
-
                 const historyItem = document.createElement('div');
                 historyItem.className = 'ml-6 relative';
                 historyItem.innerHTML = `<div class="timeline-point bg-${{color}}-500"></div><div class="flex items-center mb-1"><span class="text-sm font-bold text-gray-900">${{current.tarih}}</span></div><div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"><p class="text-sm font-medium text-gray-800 mb-1">${{title}}</p>${{detailsHtml}}</div>`;
@@ -320,13 +302,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             reader.onload = function(e) {{
                 try {{
                     const json = JSON.parse(e.target.result);
-                    if (Array.isArray(json)) {{
-                        appData = json;
-                        // Yedek yüklenince sunucu saatini sıfırla ki yedeğin saati görünsün
-                        serverLastCheck = null;
-                        renderUI(appData);
-                        alert("Yedek başarıyla yüklendi!");
-                    }} else {{ alert("Hatalı format."); }}
+                    if (Array.isArray(json)) {{ appData = json; serverLastCheck = null; renderUI(appData); alert("Yedek yüklendi!"); }} 
+                    else {{ alert("Hatalı format."); }}
                 }} catch (error) {{ alert("Hata: " + error); }}
             }};
             reader.readAsText(file);
@@ -343,14 +320,11 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
         
         async function callGeminiAPI(prompt) {{
             toggleResponseArea(true);
-            
-            // HATA YAKALAMA: API Anahtarı Yoksa Uyar
             if (!apiKey || apiKey === "") {{
                 document.getElementById('ai-result').innerHTML = `<div class="text-red-500 p-3 bg-red-50 rounded border border-red-200">⚠️ <strong>API Anahtarı Eksik!</strong><br>Lütfen GitHub Secrets ayarlarından GEMINI_API_KEY eklediğinden emin ol.</div>`;
                 document.getElementById('ai-loader').classList.add('hidden');
                 return;
             }}
-
             try {{
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${{apiKey}}`, {{
                     method: 'POST', headers: {{ 'Content-Type': 'application/json' }},
@@ -371,7 +345,6 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             const container = document.getElementById('current-list-container');
             if (!container) return "";
             let listText = "Yozgat Eczacı Odası Güncel Sıralı Dağıtım Listesi:\\n";
-            // Kart başlık ve içeriklerini topla
             const cards = container.querySelectorAll('.border.rounded-xl');
             cards.forEach(card => {{
                 const header = card.querySelector('span.border')?.innerText || "";
@@ -386,7 +359,6 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
     </script>
     """
 
-    # HTML Sablonu - GÜNCELLEME: Meta Tag'ler Eklendi
     html = f"""<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -540,7 +512,11 @@ def main():
         print(f"[{simdi}] Site kontrol ediliyor...")
         yeni_liste = veri_cek()
         
-        if yeni_liste:
+        # EMNİYET KİLİDİ: Liste boşsa veya hata varsa güncelleme yapma!
+        if not yeni_liste:
+            print("⚠️ UYARI: Web sitesinden veri çekilemedi veya liste boş geldi.")
+            print("⚠️ GÜVENLİK: Mevcut liste korunacak, güncelleme iptal ediliyor.")
+        else:
             degisiklik_var = False
             if not gecmis_veriler:
                 degisiklik_var = True
@@ -555,18 +531,10 @@ def main():
                 gecmis_veriler.append(kayit)
                 with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
                     json.dump(gecmis_veriler, f, ensure_ascii=False, indent=4)
-                # Güncelleme olunca yeni saatle raporu oluştur
-                rapor_olustur(gecmis_veriler)
-            else:
-                print("Değişiklik yok. Rapor arayüzü yenileniyor...")
-                # Güncelleme OLMASA BİLE yeni saatle raporu oluştur (Bu kısım tarihi günceller)
-                rapor_olustur(gecmis_veriler)
-        else:
-            print("Veri çekilemedi.")
+                
+            # Her durumda (değişiklik olsun olmasın) raporu yeniden oluştur (Tarih güncellensin diye)
+            rapor_olustur(gecmis_veriler)
 
-        # GitHub Actions'ta döngüyü kırmak gerekir, aksi halde sonsuza kadar çalışır ve zaman aşımına uğrar.
-        # Yerel testler için while True kalabilir ama GitHub Actions tek seferlik çalışmalıdır.
-        # Bu yüzden burada 'break' ekliyorum.
         break 
 
 if __name__ == "__main__":
