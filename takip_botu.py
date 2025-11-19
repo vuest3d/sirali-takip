@@ -11,7 +11,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- AYARLAR ---
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
-KONTROL_ARALIGI_DAKIKA = 30  # <-- İŞTE BU SATIR EKSİKTİ, GERİ GELDİ!
+KONTROL_ARALIGI_DAKIKA = 30
 VERI_DOSYASI = "gecmis_kayitlar.json"
 RAPOR_DOSYASI = "index.html"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
@@ -36,57 +36,48 @@ def veri_cek():
         gecici_gorev = "" 
         kayit_basladi = False
         
-        # --- YÖNTEM 1: Başlık Bazlı Arama ---
+        # --- YÖNTEM 1: "MERKEZ" Başlığını Takip Et ---
         for satir in satirlar:
-            # "MERKEZ" kelimesini esnek ara
+            # Başlangıcı yakala
             if "MERKEZ" in satir.upper() and len(satir) < 50:
                 kayit_basladi = True
                 continue
             
-            # Bitiş kelimeleri
+            # Bitişi yakala (Diğer ilçeye geçiş)
             if ("AKDAĞMADENİ" in satir.upper() or "İLÇELER" in satir.upper()) and kayit_basladi:
                 break
             
             if kayit_basladi and satir != "+" and "Tarihçe" not in satir:
-                # Satırda ECZANE kelimesi geçiyor mu?
-                if "ECZANE" in satir.upper():
-                    # Eğer hafızada bekleyen bir görev adı varsa birleştir
+                if "ECZANESİ" in satir.upper() or "ECZANESI" in satir.upper():
                     if gecici_gorev:
                         merkez_listesi.append(f"{gecici_gorev} {satir}")
                         gecici_gorev = ""
                     else:
-                        # Görev adı yakalanamadıysa olduğu gibi ekle
                         merkez_listesi.append(satir)
                 else:
-                    # Eczane değilse bu bir görev adıdır, hafızaya al
-                    if len(satir) < 100:
+                    if len(satir) < 100: # Çok uzun metinleri görev adı sanma
                         gecici_gorev = satir
         
-        # --- YÖNTEM 2: Yedek (Eğer Yöntem 1 sonuç vermezse) ---
+        # --- YÖNTEM 2: (Yedek) Eğer Merkez başlığı altında bir şey bulamazsa tüm sayfayı tara ---
         if not merkez_listesi:
-            print("⚠️ Başlıklar bulunamadı, tüm sayfa taranıyor...")
-            for i, satir in enumerate(satirlar):
-                if "ECZANE" in satir.upper() and "NÖBETÇİ" not in satir.upper() and "REHBERİ" not in satir.upper():
-                    # Bir önceki satırı görev adı kabul et
-                    gorev = satirlar[i-1] if i > 0 else "DAĞITIM SIRASI"
-                    # Görev adı mantıklı mı kontrol et
-                    if len(gorev) > 60 or "TELEFON" in gorev.upper() or "ADRES" in gorev.upper():
-                        gorev = "DAĞITIM LİSTESİ"
-                    
-                    full_item = f"{gorev} {satir}"
-                    merkez_listesi.append(full_item)
+            print("⚠️ Uyarı: Merkez başlığı altında veri bulunamadı. Tüm sayfa taranıyor...")
+            gecici_gorev = "GENEL LİSTE"
+            for satir in satirlar:
+                if "ECZANESİ" in satir.upper() or "ECZANESI" in satir.upper():
+                    # Eczane bulduk, listeye ekle
+                    merkez_listesi.append(f"{gecici_gorev} {satir}")
+                elif len(satir) < 80 and "NÖBETÇİ" not in satir.upper() and "REHBERİ" not in satir.upper():
+                     # Potansiyel görev adı
+                     gecici_gorev = satir
 
-        # Listeyi temizle
-        temiz_liste = list(dict.fromkeys([x for x in merkez_listesi if len(x) > 10]))
+        # Listeyi temizle ve benzersiz yap
+        temiz_liste = list(dict.fromkeys([x for x in merkez_listesi if len(x) > 5]))
         
-        if not temiz_liste:
-            return ["HATA: Web sitesinden veri okunamadı. Site yapısı değişmiş olabilir."]
-            
         return temiz_liste
 
     except Exception as e:
         print(f"Hata oluştu: {e}")
-        return None
+        return None # Hata durumunda None dön
 
 def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
     # CSS Kodu
@@ -127,9 +118,10 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             if (match) {{
                 let header = match[1].trim();
                 let pharmacy = match[2].trim();
-                if (!header) header = "GENEL DAĞITIM";
+                if (!header) header = "DAĞITIM SIRASI";
                 return {{ header: header, pharmacy: pharmacy }};
             }}
+            // Eşleşme yoksa
             return {{ header: "BİLGİ", pharmacy: text }};
         }}
 
@@ -147,18 +139,13 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             return {{ card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", badge: "bg-gray-100 text-gray-700 border-gray-200", icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white", text: "text-gray-800 group-hover:text-gray-600" }};
         }}
 
-        function openFullHistoryModal() {{
-            document.getElementById('full-history-modal').classList.remove('hidden');
-            switchHistoryTab('changes'); 
-        }}
-
+        function openFullHistoryModal() {{ document.getElementById('full-history-modal').classList.remove('hidden'); switchHistoryTab('changes'); }}
         function closeFullHistoryModal() {{ document.getElementById('full-history-modal').classList.add('hidden'); }}
 
         function switchHistoryTab(tabName) {{
             const contentArea = document.getElementById('history-content-area');
             const tabChanges = document.getElementById('tab-changes');
             const tabSnapshots = document.getElementById('tab-snapshots');
-
             if(tabName === 'changes') {{
                 tabChanges.className = 'py-4 px-6 tab-active transition-colors flex items-center gap-2';
                 tabSnapshots.className = 'py-4 px-6 tab-inactive transition-colors flex items-center gap-2';
@@ -172,67 +159,50 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
         function renderChangesView() {{
             let html = '<div class="space-y-6">';
-            for (let i = 0; i < appData.length; i++) {{
+            if (appData.length === 0) return '<div class="p-4 text-center text-gray-500">Henüz veri yok.</div>';
+            for (let i = appData.length - 1; i >= 0; i--) {{
                 const current = appData[i];
-                const prev = (i + 1 < appData.length) ? appData[i+1] : null;
-                
+                const prev = (i > 0) ? appData[i-1] : null;
                 let changesHtml = '';
-                if (!prev) {{
-                    changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>';
-                }} else {{
+                if (!prev) {{ changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>'; }} 
+                else {{
                     const currentSet = new Set(current.liste);
                     const prevSet = new Set(prev.liste);
                     const added = current.liste.filter(x => !prevSet.has(x));
                     const removed = prev.liste.filter(x => !currentSet.has(x));
-
                     if (added.length === 0 && removed.length === 0) continue; 
-
                     changesHtml += '<div class="grid grid-cols-1 gap-2">';
-                    removed.forEach(item => {{
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-700 line-through text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
-                    }});
-                    added.forEach(item => {{
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="text-gray-800 text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
-                    }});
+                    removed.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-500 line-through">${{p.pharmacy}}</div></div></div>`; }});
+                    added.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="font-bold text-gray-800">${{p.pharmacy}}</div></div></div>`; }});
                     changesHtml += '</div>';
                 }}
-
                 html += `<div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-3 h-3 bg-blue-500 rounded-full mt-2"></div><div class="w-0.5 bg-gray-200 h-full mt-1"></div></div><div class="flex-grow pb-6"><span class="text-sm font-bold text-gray-900 bg-white border px-2 py-1 rounded shadow-sm">${{current.tarih}}</span><div class="mt-3 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">${{changesHtml}}</div></div></div>`;
             }}
-            html += '</div>';
-            return html;
+            html += '</div>'; return html;
         }}
 
         function renderSnapshotsView() {{
             let html = '<div class="grid grid-cols-1 gap-6">';
-            appData.forEach((record, index) => {{
+            for (let i = appData.length - 1; i >= 0; i--) {{
+                const record = appData[i];
                 html += `<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-calendar-alt"></i> ${{record.tarih}}</span><span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${{record.liste.length}} Kayıt</span></div><div class="p-4 max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">${{record.liste.map(item => {{ const p = parseItem(item); return `<div class="text-sm border p-2 rounded hover:bg-gray-50"><span class="text-gray-500 text-xs block">${{p.header}}</span><span class="font-semibold text-gray-800">${{p.pharmacy}}</span></div>`; }}).join('')}}</div></div>`;
-            }});
-            html += '</div>';
-            return html;
+            }}
+            html += '</div>'; return html;
         }}
 
         function showHistory(targetHeader) {{
             const historyList = [];
             appData.forEach(record => {{
                 const foundItem = record.liste.find(item => parseItem(item).header === targetHeader);
-                if (foundItem) {{
-                    const parsed = parseItem(foundItem);
-                    historyList.push({{ date: record.tarih, pharmacy: parsed.pharmacy }});
-                }}
+                if (foundItem) {{ const parsed = parseItem(foundItem); historyList.push({{ date: record.tarih, pharmacy: parsed.pharmacy }}); }}
             }});
-
             document.getElementById('modal-title').innerText = targetHeader;
             const contentDiv = document.getElementById('modal-content');
-            
             let html = '';
-            if(historyList.length === 0) {{
-                html = '<div class="p-8 text-center text-gray-500">Bu görev için geçmiş kayıt bulunamadı.</div>';
-            }} else {{
+            if(historyList.length === 0) {{ html = '<div class="p-8 text-center text-gray-500">Kayıt yok.</div>'; }} 
+            else {{
                 html = '<div class="divide-y divide-gray-200 bg-white border-b">';
-                historyList.forEach((h, index) => {{
+                historyList.reverse().forEach((h, index) => {{
                     const isLatest = index === 0;
                     html += `<div class="flex items-center p-4 hover:bg-blue-50 transition-colors ${{isLatest ? 'bg-blue-50' : ''}}"><div class="w-36 flex-shrink-0 flex flex-col"><span class="text-xs font-bold text-gray-400 uppercase">Tarih</span><span class="text-sm font-mono text-gray-600">${{h.date}}</span></div><div class="flex-grow border-l border-gray-200 pl-4 ml-2"><div class="text-xs font-bold text-gray-400 uppercase mb-0.5">Sıradaki Eczane</div><div class="text-lg font-bold ${{isLatest ? 'text-blue-600' : 'text-gray-800'}}">${{h.pharmacy}}${{isLatest ? '<span class="ml-2 inline-block bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full align-middle">GÜNCEL</span>' : ''}}</div></div></div>`;
                 }});
@@ -245,14 +215,20 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
         function closeModal() {{ document.getElementById('history-modal').classList.add('hidden'); }}
 
         function renderUI(data) {{
-            if (!data || data.length === 0) return;
+            if (!data || data.length === 0) {{
+                document.getElementById('current-list-container').innerHTML = '<div class="p-10 text-center text-gray-500"><i class="fas fa-exclamation-circle text-4xl mb-3 block"></i>Veri bulunamadı.<br><span class="text-xs text-gray-400">Site yapısı değişmiş veya erişim engeli olabilir.</span></div>';
+                return;
+            }}
             const lastRecord = data[data.length - 1];
             
-            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{
-                document.getElementById('last-check-display').innerText = serverLastCheck;
-            }} else {{
-                document.getElementById('last-check-display').innerText = lastRecord.tarih;
+            // Hata mesajı kontrolü
+            if (lastRecord.liste.length === 1 && (lastRecord.liste[0].includes("HATA") || lastRecord.liste[0].includes("SİSTEM UYARISI"))) {{
+                 document.getElementById('current-list-container').innerHTML = `<div class="p-6 bg-red-50 border border-red-200 rounded-lg text-red-700 text-center"><strong>Veri Çekilemedi:</strong><br>${{lastRecord.liste[0]}}</div>`;
+                 return;
             }}
+
+            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{ document.getElementById('last-check-display').innerText = serverLastCheck; }} 
+            else {{ document.getElementById('last-check-display').innerText = lastRecord.tarih; }}
             
             const listContainer = document.getElementById('current-list-container');
             listContainer.innerHTML = '';
@@ -271,8 +247,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
             const historyContainer = document.getElementById('history-container');
             historyContainer.innerHTML = '';
-
-            for (let i = data.length - 1; i >= 0; i--) {{
+            
+            for (let i = data.length - 1; i > 0; i--) {{
                 const current = data[i];
                 const prev = data[i-1];
                 
