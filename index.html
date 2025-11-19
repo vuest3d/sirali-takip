@@ -136,7 +136,7 @@
     </script>
     
     <script>
-        let serverLastCheck = "19.11.2025 07:17";
+        let serverLastCheck = "19.11.2025 07:28";
         const apiKey = "";
 
         function manualRefresh() { 
@@ -153,9 +153,10 @@
             if (match) {
                 let header = match[1].trim();
                 let pharmacy = match[2].trim();
-                if (!header) header = "GENEL DAĞITIM";
+                if (!header) header = "DAĞITIM SIRASI";
                 return { header: header, pharmacy: pharmacy };
             }
+            // Eşleşme yoksa
             return { header: "BİLGİ", pharmacy: text };
         }
 
@@ -173,18 +174,13 @@
             return { card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", badge: "bg-gray-100 text-gray-700 border-gray-200", icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white", text: "text-gray-800 group-hover:text-gray-600" };
         }
 
-        function openFullHistoryModal() {
-            document.getElementById('full-history-modal').classList.remove('hidden');
-            switchHistoryTab('changes'); 
-        }
-
+        function openFullHistoryModal() { document.getElementById('full-history-modal').classList.remove('hidden'); switchHistoryTab('changes'); }
         function closeFullHistoryModal() { document.getElementById('full-history-modal').classList.add('hidden'); }
 
         function switchHistoryTab(tabName) {
             const contentArea = document.getElementById('history-content-area');
             const tabChanges = document.getElementById('tab-changes');
             const tabSnapshots = document.getElementById('tab-snapshots');
-
             if(tabName === 'changes') {
                 tabChanges.className = 'py-4 px-6 tab-active transition-colors flex items-center gap-2';
                 tabSnapshots.className = 'py-4 px-6 tab-inactive transition-colors flex items-center gap-2';
@@ -198,67 +194,50 @@
 
         function renderChangesView() {
             let html = '<div class="space-y-6">';
-            for (let i = 0; i < appData.length; i++) {
+            if (appData.length === 0) return '<div class="p-4 text-center text-gray-500">Henüz veri yok.</div>';
+            for (let i = appData.length - 1; i >= 0; i--) {
                 const current = appData[i];
-                const prev = (i + 1 < appData.length) ? appData[i+1] : null;
-                
+                const prev = (i > 0) ? appData[i-1] : null;
                 let changesHtml = '';
-                if (!prev) {
-                    changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>';
-                } else {
+                if (!prev) { changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>'; } 
+                else {
                     const currentSet = new Set(current.liste);
                     const prevSet = new Set(prev.liste);
                     const added = current.liste.filter(x => !prevSet.has(x));
                     const removed = prev.liste.filter(x => !currentSet.has(x));
-
                     if (added.length === 0 && removed.length === 0) continue; 
-
                     changesHtml += '<div class="grid grid-cols-1 gap-2">';
-                    removed.forEach(item => {
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-700 line-through text-sm"><span class="font-semibold">${p.header}:</span> ${p.pharmacy}</div></div></div>`;
-                    });
-                    added.forEach(item => {
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="text-gray-800 text-sm"><span class="font-semibold">${p.header}:</span> ${p.pharmacy}</div></div></div>`;
-                    });
+                    removed.forEach(item => { const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-500 line-through">${p.pharmacy}</div></div></div>`; });
+                    added.forEach(item => { const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="font-bold text-gray-800">${p.pharmacy}</div></div></div>`; });
                     changesHtml += '</div>';
                 }
-
                 html += `<div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-3 h-3 bg-blue-500 rounded-full mt-2"></div><div class="w-0.5 bg-gray-200 h-full mt-1"></div></div><div class="flex-grow pb-6"><span class="text-sm font-bold text-gray-900 bg-white border px-2 py-1 rounded shadow-sm">${current.tarih}</span><div class="mt-3 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">${changesHtml}</div></div></div>`;
             }
-            html += '</div>';
-            return html;
+            html += '</div>'; return html;
         }
 
         function renderSnapshotsView() {
             let html = '<div class="grid grid-cols-1 gap-6">';
-            appData.forEach((record, index) => {
+            for (let i = appData.length - 1; i >= 0; i--) {
+                const record = appData[i];
                 html += `<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-calendar-alt"></i> ${record.tarih}</span><span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${record.liste.length} Kayıt</span></div><div class="p-4 max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">${record.liste.map(item => { const p = parseItem(item); return `<div class="text-sm border p-2 rounded hover:bg-gray-50"><span class="text-gray-500 text-xs block">${p.header}</span><span class="font-semibold text-gray-800">${p.pharmacy}</span></div>`; }).join('')}</div></div>`;
-            });
-            html += '</div>';
-            return html;
+            }
+            html += '</div>'; return html;
         }
 
         function showHistory(targetHeader) {
             const historyList = [];
             appData.forEach(record => {
                 const foundItem = record.liste.find(item => parseItem(item).header === targetHeader);
-                if (foundItem) {
-                    const parsed = parseItem(foundItem);
-                    historyList.push({ date: record.tarih, pharmacy: parsed.pharmacy });
-                }
+                if (foundItem) { const parsed = parseItem(foundItem); historyList.push({ date: record.tarih, pharmacy: parsed.pharmacy }); }
             });
-
             document.getElementById('modal-title').innerText = targetHeader;
             const contentDiv = document.getElementById('modal-content');
-            
             let html = '';
-            if(historyList.length === 0) {
-                html = '<div class="p-8 text-center text-gray-500">Bu görev için geçmiş kayıt bulunamadı.</div>';
-            } else {
+            if(historyList.length === 0) { html = '<div class="p-8 text-center text-gray-500">Kayıt yok.</div>'; } 
+            else {
                 html = '<div class="divide-y divide-gray-200 bg-white border-b">';
-                historyList.forEach((h, index) => {
+                historyList.reverse().forEach((h, index) => {
                     const isLatest = index === 0;
                     html += `<div class="flex items-center p-4 hover:bg-blue-50 transition-colors ${isLatest ? 'bg-blue-50' : ''}"><div class="w-36 flex-shrink-0 flex flex-col"><span class="text-xs font-bold text-gray-400 uppercase">Tarih</span><span class="text-sm font-mono text-gray-600">${h.date}</span></div><div class="flex-grow border-l border-gray-200 pl-4 ml-2"><div class="text-xs font-bold text-gray-400 uppercase mb-0.5">Sıradaki Eczane</div><div class="text-lg font-bold ${isLatest ? 'text-blue-600' : 'text-gray-800'}">${h.pharmacy}${isLatest ? '<span class="ml-2 inline-block bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full align-middle">GÜNCEL</span>' : ''}</div></div></div>`;
                 });
@@ -271,14 +250,20 @@
         function closeModal() { document.getElementById('history-modal').classList.add('hidden'); }
 
         function renderUI(data) {
-            if (!data || data.length === 0) return;
+            if (!data || data.length === 0) {
+                document.getElementById('current-list-container').innerHTML = '<div class="p-10 text-center text-gray-500"><i class="fas fa-exclamation-circle text-4xl mb-3 block"></i>Veri bulunamadı.<br><span class="text-xs text-gray-400">Site yapısı değişmiş veya erişim engeli olabilir.</span></div>';
+                return;
+            }
             const lastRecord = data[data.length - 1];
             
-            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {
-                document.getElementById('last-check-display').innerText = serverLastCheck;
-            } else {
-                document.getElementById('last-check-display').innerText = lastRecord.tarih;
+            // Hata mesajı kontrolü
+            if (lastRecord.liste.length === 1 && (lastRecord.liste[0].includes("HATA") || lastRecord.liste[0].includes("SİSTEM UYARISI"))) {
+                 document.getElementById('current-list-container').innerHTML = `<div class="p-6 bg-red-50 border border-red-200 rounded-lg text-red-700 text-center"><strong>Veri Çekilemedi:</strong><br>${lastRecord.liste[0]}</div>`;
+                 return;
             }
+
+            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) { document.getElementById('last-check-display').innerText = serverLastCheck; } 
+            else { document.getElementById('last-check-display').innerText = lastRecord.tarih; }
             
             const listContainer = document.getElementById('current-list-container');
             listContainer.innerHTML = '';
@@ -297,8 +282,8 @@
 
             const historyContainer = document.getElementById('history-container');
             historyContainer.innerHTML = '';
-
-            for (let i = data.length - 1; i >= 0; i--) {
+            
+            for (let i = data.length - 1; i > 0; i--) {
                 const current = data[i];
                 const prev = data[i-1];
                 
