@@ -9,6 +9,7 @@ from datetime import datetime
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
 VERI_DOSYASI = "gecmis_kayitlar.json"
 RAPOR_DOSYASI = "index.html"
+# GitHub'da Settings > Secrets kısmına eklediğin anahtarı alır
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "") 
 
 def veri_cek():
@@ -36,17 +37,13 @@ def veri_cek():
                 break
             
             if kayit_basladi and satir != "+":
-                # Eğer satırda "ECZANESİ" geçiyorsa, bu bir eczane ismidir.
-                # Hafızadaki görev adıyla birleştirip listeye ekleriz.
                 if "ECZANESİ" in satir.upper():
                     if gecici_gorev:
                         merkez_listesi.append(f"{gecici_gorev} {satir}")
-                        gecici_gorev = "" # Görevi kullandık, sıfırla
+                        gecici_gorev = "" 
                     else:
-                        # Görev adı yakalanamadıysa sadece eczaneyi ekle
                         merkez_listesi.append(satir)
                 else:
-                    # Eczane değilse bu bir görev başlığıdır, hafızada tut.
                     gecici_gorev = satir
                     
         return merkez_listesi
@@ -79,6 +76,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
     <script>
         // Python'dan gelen güncel kontrol saati
         let serverLastCheck = "{son_kontrol_tarihi}";
+        // Python'dan gelen API Anahtarı (Eğer yoksa boş gelir)
+        const apiKey = "{GEMINI_API_KEY}";
 
         function manualRefresh() {{ 
             const url = window.location.href.split('?')[0];
@@ -95,81 +94,26 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
         function getTheme(headerText) {{
             const text = headerText.toUpperCase();
-            if (text.includes("MOR") || text.includes("TURUNCU")) return {{ 
-                card: "bg-gradient-to-br from-white to-orange-50 border-orange-200 hover:to-orange-100 border-l-orange-500", 
-                badge: "bg-orange-100 text-orange-800 border-orange-200", 
-                icon: "text-orange-500 bg-orange-50 group-hover:bg-orange-500 group-hover:text-white",
-                text: "text-orange-900 group-hover:text-orange-700"
-            }};
-            if (text.includes("ERİTROPOEİTİN") || text.includes("DARBEPOETİN")) return {{ 
-                card: "bg-gradient-to-br from-white to-blue-50 border-blue-200 hover:to-blue-100 border-l-blue-500", 
-                badge: "bg-blue-100 text-blue-800 border-blue-200", 
-                icon: "text-blue-500 bg-blue-50 group-hover:bg-blue-500 group-hover:text-white",
-                text: "text-blue-900 group-hover:text-blue-700"
-            }};
-            if (text.includes("DİYALİZ")) return {{ 
-                card: "bg-gradient-to-br from-white to-cyan-50 border-cyan-200 hover:to-cyan-100 border-l-cyan-500", 
-                badge: "bg-cyan-100 text-cyan-800 border-cyan-200", 
-                icon: "text-cyan-500 bg-cyan-50 group-hover:bg-cyan-500 group-hover:text-white",
-                text: "text-cyan-900 group-hover:text-cyan-700"
-            }};
-            if (text.includes("TÜP BEBEK")) return {{ 
-                card: "bg-gradient-to-br from-white to-pink-50 border-pink-200 hover:to-pink-100 border-l-pink-500", 
-                badge: "bg-pink-100 text-pink-800 border-pink-200", 
-                icon: "text-pink-500 bg-pink-50 group-hover:bg-pink-500 group-hover:text-white",
-                text: "text-pink-900 group-hover:text-pink-700"
-            }};
-            if (text.includes("CEZAEVİ")) return {{ 
-                card: "bg-gradient-to-br from-white to-red-50 border-red-200 hover:to-red-100 border-l-red-500", 
-                badge: "bg-red-100 text-red-800 border-red-200", 
-                icon: "text-red-500 bg-red-50 group-hover:bg-red-500 group-hover:text-white",
-                text: "text-red-900 group-hover:text-red-700"
-            }};
-            if (text.includes("KANAKINUMAB")) return {{ 
-                card: "bg-gradient-to-br from-white to-indigo-50 border-indigo-200 hover:to-indigo-100 border-l-indigo-500", 
-                badge: "bg-indigo-100 text-indigo-800 border-indigo-200", 
-                icon: "text-indigo-500 bg-indigo-50 group-hover:bg-indigo-500 group-hover:text-white",
-                text: "text-indigo-900 group-hover:text-indigo-700"
-            }};
-            if (text.includes("YATAN HASTA")) return {{ 
-                card: "bg-gradient-to-br from-white to-emerald-50 border-emerald-200 hover:to-emerald-100 border-l-emerald-500", 
-                badge: "bg-emerald-100 text-emerald-800 border-emerald-200", 
-                icon: "text-emerald-500 bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white",
-                text: "text-emerald-900 group-hover:text-emerald-700"
-            }};
-            if (text.includes("ANTİ-TNF")) return {{ 
-                card: "bg-gradient-to-br from-white to-teal-50 border-teal-200 hover:to-teal-100 border-l-teal-500", 
-                badge: "bg-teal-100 text-teal-800 border-teal-200", 
-                icon: "text-teal-500 bg-teal-50 group-hover:bg-teal-500 group-hover:text-white",
-                text: "text-teal-900 group-hover:text-teal-700"
-            }};
-            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return {{ 
-                card: "bg-gradient-to-br from-white to-violet-50 border-violet-200 hover:to-violet-100 border-l-violet-500", 
-                badge: "bg-violet-100 text-violet-800 border-violet-200", 
-                icon: "text-violet-500 bg-violet-50 group-hover:bg-violet-500 group-hover:text-white",
-                text: "text-violet-900 group-hover:text-violet-700"
-            }};
+            if (text.includes("MOR") || text.includes("TURUNCU")) return {{ card: "bg-gradient-to-br from-white to-orange-50 border-orange-200 hover:to-orange-100 border-l-orange-500", badge: "bg-orange-100 text-orange-800 border-orange-200", icon: "text-orange-500 bg-orange-50 group-hover:bg-orange-500 group-hover:text-white", text: "text-orange-900 group-hover:text-orange-700" }};
+            if (text.includes("ERİTROPOEİTİN") || text.includes("DARBEPOETİN")) return {{ card: "bg-gradient-to-br from-white to-blue-50 border-blue-200 hover:to-blue-100 border-l-blue-500", badge: "bg-blue-100 text-blue-800 border-blue-200", icon: "text-blue-500 bg-blue-50 group-hover:bg-blue-500 group-hover:text-white", text: "text-blue-900 group-hover:text-blue-700" }};
+            if (text.includes("DİYALİZ")) return {{ card: "bg-gradient-to-br from-white to-cyan-50 border-cyan-200 hover:to-cyan-100 border-l-cyan-500", badge: "bg-cyan-100 text-cyan-800 border-cyan-200", icon: "text-cyan-500 bg-cyan-50 group-hover:bg-cyan-500 group-hover:text-white", text: "text-cyan-900 group-hover:text-cyan-700" }};
+            if (text.includes("TÜP BEBEK")) return {{ card: "bg-gradient-to-br from-white to-pink-50 border-pink-200 hover:to-pink-100 border-l-pink-500", badge: "bg-pink-100 text-pink-800 border-pink-200", icon: "text-pink-500 bg-pink-50 group-hover:bg-pink-500 group-hover:text-white", text: "text-pink-900 group-hover:text-pink-700" }};
+            if (text.includes("CEZAEVİ")) return {{ card: "bg-gradient-to-br from-white to-red-50 border-red-200 hover:to-red-100 border-l-red-500", badge: "bg-red-100 text-red-800 border-red-200", icon: "text-red-500 bg-red-50 group-hover:bg-red-500 group-hover:text-white", text: "text-red-900 group-hover:text-red-700" }};
+            if (text.includes("KANAKINUMAB")) return {{ card: "bg-gradient-to-br from-white to-indigo-50 border-indigo-200 hover:to-indigo-100 border-l-indigo-500", badge: "bg-indigo-100 text-indigo-800 border-indigo-200", icon: "text-indigo-500 bg-indigo-50 group-hover:bg-indigo-500 group-hover:text-white", text: "text-indigo-900 group-hover:text-indigo-700" }};
+            if (text.includes("YATAN HASTA")) return {{ card: "bg-gradient-to-br from-white to-emerald-50 border-emerald-200 hover:to-emerald-100 border-l-emerald-500", badge: "bg-emerald-100 text-emerald-800 border-emerald-200", icon: "text-emerald-500 bg-emerald-50 group-hover:bg-emerald-500 group-hover:text-white", text: "text-emerald-900 group-hover:text-emerald-700" }};
+            if (text.includes("ANTİ-TNF")) return {{ card: "bg-gradient-to-br from-white to-teal-50 border-teal-200 hover:to-teal-100 border-l-teal-500", badge: "bg-teal-100 text-teal-800 border-teal-200", icon: "text-teal-500 bg-teal-50 group-hover:bg-teal-500 group-hover:text-white", text: "text-teal-900 group-hover:text-teal-700" }};
+            if (text.includes("İŞ YERİ") || text.includes("HEKİM") || text.includes("SOSYAL") || text.includes("ÇOCUK")) return {{ card: "bg-gradient-to-br from-white to-violet-50 border-violet-200 hover:to-violet-100 border-l-violet-500", badge: "bg-violet-100 text-violet-800 border-violet-200", icon: "text-violet-500 bg-violet-50 group-hover:bg-violet-500 group-hover:text-white", text: "text-violet-900 group-hover:text-violet-700" }};
 
-            return {{ 
-                card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
-                badge: "bg-gray-100 text-gray-700 border-gray-200", 
-                icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white",
-                text: "text-gray-800 group-hover:text-gray-600"
-            }};
+            return {{ card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", badge: "bg-gray-100 text-gray-700 border-gray-200", icon: "text-gray-400 bg-gray-50 group-hover:bg-gray-500 group-hover:text-white", text: "text-gray-800 group-hover:text-gray-600" }};
         }}
 
-        function openFullHistoryModal() {{
-            document.getElementById('full-history-modal').classList.remove('hidden');
-            switchHistoryTab('changes'); 
-        }}
-
+        function openFullHistoryModal() {{ document.getElementById('full-history-modal').classList.remove('hidden'); switchHistoryTab('changes'); }}
         function closeFullHistoryModal() {{ document.getElementById('full-history-modal').classList.add('hidden'); }}
 
         function switchHistoryTab(tabName) {{
             const contentArea = document.getElementById('history-content-area');
             const tabChanges = document.getElementById('tab-changes');
             const tabSnapshots = document.getElementById('tab-snapshots');
-
             if(tabName === 'changes') {{
                 tabChanges.className = 'py-4 px-6 tab-active transition-colors flex items-center gap-2';
                 tabSnapshots.className = 'py-4 px-6 tab-inactive transition-colors flex items-center gap-2';
@@ -186,32 +130,22 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             for (let i = 0; i < appData.length; i++) {{
                 const current = appData[i];
                 const prev = (i + 1 < appData.length) ? appData[i+1] : null;
-                
                 let changesHtml = '';
-                if (!prev) {{
-                    changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>';
-                }} else {{
+                if (!prev) {{ changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>'; }} 
+                else {{
                     const currentSet = new Set(current.liste);
                     const prevSet = new Set(prev.liste);
                     const added = current.liste.filter(x => !prevSet.has(x));
                     const removed = prev.liste.filter(x => !currentSet.has(x));
                     if (added.length === 0 && removed.length === 0) continue; 
-
                     changesHtml += '<div class="grid grid-cols-1 gap-2">';
-                    removed.forEach(item => {{
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski Sıradaki Eczane</div><div class="text-gray-700 line-through text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
-                    }});
-                    added.forEach(item => {{
-                        const p = parseItem(item);
-                        changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni Sıradaki Eczane</div><div class="text-gray-800 text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`;
-                    }});
+                    removed.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-700 line-through text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`; }});
+                    added.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="text-gray-800 text-sm"><span class="font-semibold">${{p.header}}:</span> ${{p.pharmacy}}</div></div></div>`; }});
                     changesHtml += '</div>';
                 }}
                 html += `<div class="flex gap-4"><div class="flex flex-col items-center"><div class="w-3 h-3 bg-blue-500 rounded-full mt-2"></div><div class="w-0.5 bg-gray-200 h-full mt-1"></div></div><div class="flex-grow pb-6"><span class="text-sm font-bold text-gray-900 bg-white border px-2 py-1 rounded shadow-sm">${{current.tarih}}</span><div class="mt-3 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">${{changesHtml}}</div></div></div>`;
             }}
-            html += '</div>';
-            return html;
+            html += '</div>'; return html;
         }}
 
         function renderSnapshotsView() {{
@@ -219,27 +153,20 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             appData.forEach((record, index) => {{
                 html += `<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-calendar-alt"></i> ${{record.tarih}}</span><span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${{record.liste.length}} Kayıt</span></div><div class="p-4 max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">${{record.liste.map(item => {{ const p = parseItem(item); return `<div class="text-sm border p-2 rounded hover:bg-gray-50"><span class="text-gray-500 text-xs block">${{p.header}}</span><span class="font-semibold text-gray-800">${{p.pharmacy}}</span></div>`; }}).join('')}}</div></div>`;
             }});
-            html += '</div>';
-            return html;
+            html += '</div>'; return html;
         }}
 
         function showHistory(targetHeader) {{
             const historyList = [];
             appData.forEach(record => {{
                 const foundItem = record.liste.find(item => parseItem(item).header === targetHeader);
-                if (foundItem) {{
-                    const parsed = parseItem(foundItem);
-                    historyList.push({{ date: record.tarih, pharmacy: parsed.pharmacy }});
-                }}
+                if (foundItem) {{ const parsed = parseItem(foundItem); historyList.push({{ date: record.tarih, pharmacy: parsed.pharmacy }}); }}
             }});
-
             document.getElementById('modal-title').innerText = targetHeader;
             const contentDiv = document.getElementById('modal-content');
-            
             let html = '';
-            if(historyList.length === 0) {{
-                html = '<div class="p-8 text-center text-gray-500">Bu görev için geçmiş kayıt bulunamadı.</div>';
-            }} else {{
+            if(historyList.length === 0) {{ html = '<div class="p-8 text-center text-gray-500">Kayıt yok.</div>'; }} 
+            else {{
                 html = '<div class="divide-y divide-gray-200 bg-white border-b">';
                 historyList.forEach((h, index) => {{
                     const isLatest = index === 0;
@@ -257,12 +184,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             if (!data || data.length === 0) return;
             const lastRecord = data[data.length - 1];
             
-            // Sunucudan gelen güncel saat varsa onu, yoksa kayıt tarihini kullan
-            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{
-                document.getElementById('last-check-display').innerText = serverLastCheck;
-            }} else {{
-                document.getElementById('last-check-display').innerText = lastRecord.tarih;
-            }}
+            if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{ document.getElementById('last-check-display').innerText = serverLastCheck; }} 
+            else {{ document.getElementById('last-check-display').innerText = lastRecord.tarih; }}
             
             const listContainer = document.getElementById('current-list-container');
             listContainer.innerHTML = '';
@@ -288,14 +211,9 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
                 let title = "Değişiklik Tespit Edildi";
                 let color = "green";
                 let detailsHtml = "";
-
-                if (!prev) {{
-                    title = "Sistem Başlatıldı / Yedek Yüklendi";
-                    color = "gray";
-                    detailsHtml = '<p class="text-sm text-gray-600">İlk kayıt.</p>';
-                }} else if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {{
-                    continue; 
-                }} else {{
+                if (!prev) {{ title = "Sistem Başlatıldı / Yedek Yüklendi"; color = "gray"; detailsHtml = '<p class="text-sm text-gray-600">İlk kayıt.</p>'; }} 
+                else if (JSON.stringify(current.liste) === JSON.stringify(prev.liste)) {{ continue; }} 
+                else {{
                     const oldSet = new Set(prev.liste);
                     const newSet = new Set(current.liste);
                     const added = current.liste.filter(x => !oldSet.has(x));
@@ -305,7 +223,6 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
                     added.forEach(item => {{ detailsHtml += `<div class="bg-green-50 p-2 rounded border border-green-100 text-xs flex items-center"><span class="w-4 h-4 rounded bg-green-100 text-green-600 flex items-center justify-center mr-2"><i class="fas fa-plus"></i></span><span class="font-bold text-gray-800">${{item}}</span></div>`; }});
                     detailsHtml += '</div>';
                 }}
-
                 const historyItem = document.createElement('div');
                 historyItem.className = 'ml-6 relative';
                 historyItem.innerHTML = `<div class="timeline-point bg-${{color}}-500"></div><div class="flex items-center mb-1"><span class="text-sm font-bold text-gray-900">${{current.tarih}}</span></div><div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"><p class="text-sm font-medium text-gray-800 mb-1">${{title}}</p>${{detailsHtml}}</div>`;
@@ -320,13 +237,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             reader.onload = function(e) {{
                 try {{
                     const json = JSON.parse(e.target.result);
-                    if (Array.isArray(json)) {{
-                        appData = json;
-                        // Yedek yüklenince sunucu saatini sıfırla ki yedeğin saati görünsün
-                        serverLastCheck = null;
-                        renderUI(appData);
-                        alert("Yedek başarıyla yüklendi!");
-                    }} else {{ alert("Hatalı format."); }}
+                    if (Array.isArray(json)) {{ appData = json; serverLastCheck = null; renderUI(appData); alert("Yedek yüklendi!"); }} 
+                    else {{ alert("Hatalı format."); }}
                 }} catch (error) {{ alert("Hata: " + error); }}
             }};
             reader.readAsText(file);
@@ -343,6 +255,14 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
         
         async function callGeminiAPI(prompt) {{
             toggleResponseArea(true);
+            
+            // HATA YAKALAMA: API Anahtarı Yoksa Uyar
+            if (!apiKey || apiKey === "") {{
+                document.getElementById('ai-result').innerHTML = `<div class="text-red-500 p-3 bg-red-50 rounded border border-red-200">⚠️ <strong>API Anahtarı Eksik!</strong><br>Lütfen GitHub Secrets ayarlarından GEMINI_API_KEY eklediğinden emin ol.</div>`;
+                document.getElementById('ai-loader').classList.add('hidden');
+                return;
+            }}
+
             try {{
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${{apiKey}}`, {{
                     method: 'POST', headers: {{ 'Content-Type': 'application/json' }},
@@ -359,6 +279,19 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
         async function analyzeList() {{ await callGeminiAPI(`Bu listeyi analiz et: 1. Hangi eczane hangi görevi almış? 2. Birden fazla görevi olan var mı?\\n\\n` + getCurrentListData()); }}
         async function askGemini() {{ const q = document.getElementById('userQuery').value; if (!q) return; await callGeminiAPI(`LİSTE:\\n` + getCurrentListData() + `\\n\\nSORU: ${{q}}\\nKısa ve net cevapla.`); }}
+        function getCurrentListData() {{
+            const container = document.getElementById('current-list-container');
+            if (!container) return "";
+            let listText = "Yozgat Eczacı Odası Güncel Sıralı Dağıtım Listesi:\\n";
+            // Kart başlık ve içeriklerini topla
+            const cards = container.querySelectorAll('.border.rounded-xl');
+            cards.forEach(card => {{
+                const header = card.querySelector('span.border')?.innerText || "";
+                const pharmacy = card.querySelector('.text-lg')?.innerText || "";
+                if(header && pharmacy) listText += `- ${{header}}: ${{pharmacy}}\\n`;
+            }});
+            return listText;
+        }}
         document.getElementById('userQuery').addEventListener('keypress', function (e) {{ if (e.key === 'Enter') askGemini(); }});
         
         renderUI(appData);
