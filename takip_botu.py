@@ -4,6 +4,10 @@ import time
 import json
 import os
 from datetime import datetime
+import urllib3
+
+# SSL uyarılarını gizle
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- AYARLAR ---
 URL = "https://www.yozgateo.org.tr/sirali-esit-dagitim"
@@ -16,10 +20,11 @@ def veri_cek():
     """Web sitesine bağlanıp Merkez listesini akıllıca çeker ve birleştirir."""
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        response = requests.get(URL, headers=headers, timeout=30)
+        response = requests.get(URL, headers=headers, timeout=30, verify=False)
         response.raise_for_status()
+        response.encoding = 'utf-8'
         
         soup = BeautifulSoup(response.content, "html.parser")
         tum_metin = soup.get_text(separator="\n")
@@ -30,24 +35,29 @@ def veri_cek():
         kayit_basladi = False
         
         for satir in satirlar:
-            if "MERKEZ" in satir and len(satir) < 20:
+            if "MERKEZ" in satir.upper() and len(satir) < 50:
                 kayit_basladi = True
                 continue
             
-            if "AKDAĞMADENİ" in satir and kayit_basladi:
+            if ("AKDAĞMADENİ" in satir.upper() or "İLÇELER" in satir.upper()) and kayit_basladi:
                 break
             
             if kayit_basladi and satir != "+":
+                # Eczane ismi içeriyor mu?
                 if "ECZANESİ" in satir.upper():
                     if gecici_gorev:
+                        # Önceki satırda görev adı vardı, birleştir
                         merkez_listesi.append(f"{gecici_gorev} {satir}")
                         gecici_gorev = ""
                     else:
                         merkez_listesi.append(satir)
                 else:
-                    gecici_gorev = satir
+                    # Eczane değilse muhtemelen görev adıdır, hafızaya al
+                    if len(satir) < 100:
+                        gecici_gorev = satir
         
-        temiz_liste = [x for x in merkez_listesi if len(x) > 5]
+        # Listeyi temizle
+        temiz_liste = list(dict.fromkeys([x for x in merkez_listesi if len(x) > 5]))
         return temiz_liste
 
     except Exception as e:
@@ -86,7 +96,7 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
         }}
 
         function parseItem(text) {{
-            const regex = /^(.*?)(\S+\s+ECZANESİ)$/i;
+            const regex = /^(.*?)(\\S+\\s+ECZANES[İI])$/i;
             const match = text.match(regex);
             if (match) return {{ header: match[1].trim(), pharmacy: match[2].trim() }};
             return {{ header: "GENEL DAĞITIM", pharmacy: text }};
@@ -149,6 +159,7 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
                 text: "text-violet-900 group-hover:text-violet-700"
             }};
 
+            // Varsayılan
             return {{ 
                 card: "bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:to-gray-100 border-l-gray-500", 
                 badge: "bg-gray-100 text-gray-700 border-gray-200", 
@@ -168,6 +179,7 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
             const contentArea = document.getElementById('history-content-area');
             const tabChanges = document.getElementById('tab-changes');
             const tabSnapshots = document.getElementById('tab-snapshots');
+
             if(tabName === 'changes') {{
                 tabChanges.className = 'py-4 px-6 tab-active transition-colors flex items-center gap-2';
                 tabSnapshots.className = 'py-4 px-6 tab-inactive transition-colors flex items-center gap-2';
@@ -181,9 +193,11 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
         function renderChangesView() {{
             let html = '<div class="space-y-6">';
+            // Veriyi ters çevirerek göster (En yeniden eskiye)
             for (let i = appData.length - 1; i >= 0; i--) {{
                 const current = appData[i];
                 const prev = (i > 0) ? appData[i-1] : null;
+                
                 let changesHtml = '';
                 if (!prev) {{ changesHtml = '<div class="p-3 bg-gray-100 rounded text-gray-500 text-sm">İlk sistem kaydı oluşturuldu.</div>'; }} 
                 else {{
@@ -191,7 +205,10 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
                     const prevSet = new Set(prev.liste);
                     const added = current.liste.filter(x => !prevSet.has(x));
                     const removed = prev.liste.filter(x => !currentSet.has(x));
+                    
+                    // Değişiklik yoksa gösterme
                     if (added.length === 0 && removed.length === 0) continue; 
+                    
                     changesHtml += '<div class="grid grid-cols-1 gap-2">';
                     removed.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-red-50 border border-red-100 rounded"><span class="w-6 h-6 rounded-full bg-red-100 text-red-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-minus"></i></span><div><div class="text-[10px] text-red-400 font-bold uppercase">Eski</div><div class="text-gray-500 line-through">${{p.pharmacy}}</div></div></div>`; }});
                     added.forEach(item => {{ const p = parseItem(item); changesHtml += `<div class="flex items-center p-2 bg-green-50 border border-green-100 rounded"><span class="w-6 h-6 rounded-full bg-green-100 text-green-500 flex items-center justify-center mr-3 flex-shrink-0"><i class="fas fa-plus"></i></span><div><div class="text-[10px] text-green-600 font-bold uppercase">Yeni</div><div class="font-bold text-gray-800">${{p.pharmacy}}</div></div></div>`; }});
@@ -204,6 +221,7 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
         function renderSnapshotsView() {{
             let html = '<div class="grid grid-cols-1 gap-6">';
+            // Veriyi ters çevir (En yeniden eskiye)
             for (let i = appData.length - 1; i >= 0; i--) {{
                 const record = appData[i];
                 html += `<div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"><div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center"><span class="font-bold text-gray-700 flex items-center gap-2"><i class="far fa-calendar-alt"></i> ${{record.tarih}}</span><span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">${{record.liste.length}} Kayıt</span></div><div class="p-4 max-h-60 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-2">${{record.liste.map(item => {{ const p = parseItem(item); return `<div class="text-sm border p-2 rounded hover:bg-gray-50"><span class="text-gray-500 text-xs block">${{p.header}}</span><span class="font-semibold text-gray-800">${{p.pharmacy}}</span></div>`; }}).join('')}}</div></div>`;
@@ -236,7 +254,10 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
         function closeModal() {{ document.getElementById('history-modal').classList.add('hidden'); }}
 
         function renderUI(data) {{
-            if (!data || data.length === 0) return;
+            if (!data || data.length === 0) {{
+                document.getElementById('current-list-container').innerHTML = '<div class="p-10 text-center text-gray-500"><i class="fas fa-exclamation-circle text-4xl mb-3 block"></i>Veri bulunamadı veya bot henüz veri çekmedi.<br><span class="text-xs text-gray-400">Birkaç dakika içinde otomatik güncellenecektir.</span></div>';
+                return;
+            }}
             const lastRecord = data[data.length - 1];
             
             if (typeof serverLastCheck !== 'undefined' && serverLastCheck) {{ document.getElementById('last-check-display').innerText = serverLastCheck; }} 
@@ -259,7 +280,8 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
 
             const historyContainer = document.getElementById('history-container');
             historyContainer.innerHTML = '';
-
+            
+            // Geçmişi tersten (en yeniden eskiye) göster
             for (let i = data.length - 1; i > 0; i--) {{
                 const current = data[i];
                 const prev = data[i-1];
@@ -292,6 +314,9 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
                 historyItem.className = 'ml-6 relative';
                 historyItem.innerHTML = `<div class="timeline-point bg-${{color}}-500"></div><div class="flex items-center mb-1"><span class="text-sm font-bold text-gray-900">${{current.tarih}}</span></div><div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"><p class="text-sm font-medium text-gray-800 mb-1">${{title}}</p>${{detailsHtml}}</div>`;
                 historyContainer.appendChild(historyItem);
+            }}
+            if(historyContainer.innerHTML === "") {{
+                historyContainer.innerHTML = '<div class="text-gray-400 text-sm italic p-4">Henüz bir değişiklik tespit edilmedi.</div>';
             }}
         }}
 
@@ -359,6 +384,7 @@ def html_sablonu_olustur(tum_veriler_json, son_kontrol_tarihi):
     </script>
     """
 
+    # HTML Sablonu - GÜNCELLEME: Meta Tag'ler Eklendi
     html = f"""<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -513,15 +539,28 @@ def main():
         yeni_liste = veri_cek()
         
         # EMNİYET KİLİDİ: Liste boşsa veya hata varsa güncelleme yapma!
-        if not yeni_liste:
+        if not yeni_liste or (len(yeni_liste) == 1 and "HATA" in yeni_liste[0]) or (len(yeni_liste) == 1 and "SİSTEM UYARISI" in yeni_liste[0]):
             print("⚠️ UYARI: Web sitesinden veri çekilemedi veya liste boş geldi.")
-            print("⚠️ GÜVENLİK: Mevcut liste korunacak, güncelleme iptal ediliyor.")
+            print("⚠️ GÜVENLİK: Mevcut liste korunacak, ancak tarih güncellenecek.")
+            # Eğer geçmiş veri varsa onu kullanarak raporu tekrar oluştur (sadece tarih güncellenir)
+            if gecmis_veriler:
+                rapor_olustur(gecmis_veriler)
+            else:
+                # Hiç veri yoksa mecburen hata mesajını bas
+                 # İlk kurulumda boş kalmasın diye
+                 if not gecmis_veriler and yeni_liste:
+                     kayit = { "tarih": simdi, "liste": yeni_liste }
+                     gecmis_veriler.append(kayit)
+                     with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
+                        json.dump(gecmis_veriler, f, ensure_ascii=False, indent=4)
+                     rapor_olustur(gecmis_veriler)
         else:
             degisiklik_var = False
             if not gecmis_veriler:
                 degisiklik_var = True
             else:
                 son_liste = gecmis_veriler[-1]["liste"]
+                # Listeler eşit değilse güncelle
                 if set(yeni_liste) != set(son_liste):
                     degisiklik_var = True
             
@@ -532,7 +571,7 @@ def main():
                 with open(VERI_DOSYASI, "w", encoding="utf-8") as f:
                     json.dump(gecmis_veriler, f, ensure_ascii=False, indent=4)
                 
-            # Her durumda (değişiklik olsun olmasın) raporu yeniden oluştur (Tarih güncellensin diye)
+            # Her durumda raporu yeniden oluştur (Tarih güncellensin diye)
             rapor_olustur(gecmis_veriler)
 
         break 
